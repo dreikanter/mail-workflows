@@ -1,21 +1,21 @@
-# Mail Workflows - Architecture Spec (Draft)
+# Mail Workflows — Architecture Spec
 
 ## Overview
 
-An automated system that syncs Gmail to local Maildir storage, then runs
-configurable processing pipelines (including AI agents) on incoming emails,
+An automated system that syncs email from IMAP servers to local Maildir
+storage, then runs configurable processing pipelines on incoming emails,
 producing artifacts and notifications.
 
 ## Design Principles
 
 - **Maildir as the source of truth.** Each email is a file. No databases.
-  State tracking uses Maildir's own `new/` →`cur/` convention.
+  State tracking uses Maildir's own `new/` → `cur/` convention.
 - **Cron as the scheduler.** No long-running daemons. A single cron entry
   runs sync + process. Missed runs just mean a bigger batch next time.
 - **Repo = config.** The git repo contains all scripts, rules, and prompt
   templates. Clone it, add credentials, add one cron line, done.
 - **Unix philosophy.** Small composable scripts. Shell for orchestration,
-  a real language for email parsing and AI calls.
+  Ruby for email parsing and processing logic.
 
 ## High-Level Flow
 
@@ -23,17 +23,17 @@ producing artifacts and notifications.
 cron (every N minutes)
   +-- run
       +-- 1. acquire lock (flock, skip if already running)
-      +-- 2. sync: mbsync pulls new mail →Maildir new/
+      +-- 2. sync: mbsync pulls new mail → Maildir new/
       +-- 3. process: for each .eml in new/
-              +-- match against rules (from, subject, labels)
+              +-- match against rules (from, subject regex)
               +-- preprocess (extract PDF text, strip HTML, etc.)
-              +-- run AI agent with matched prompt template
+              +-- handle: run script or LLM with matched prompt
               +-- deliver artifacts / send notifications
               +-- move .eml to cur/ (marks as processed)
 ```
 
 After downtime, cron fires, mbsync fetches all accumulated mail, and the
-processor handles the entire batch. No special catch-up logic needed —this
+processor handles the entire batch. No special catch-up logic needed — this
 falls out naturally from Maildir semantics.
 
 ## Directory Layout
@@ -41,11 +41,12 @@ falls out naturally from Maildir semantics.
 ```
 mail-workflows/
 +-- bin/
-|   +-- run                # Entry point (lock →sync →process)
+|   +-- run                # Entry point (lock → sync → process)
 |   +-- sync               # Wraps mbsync
 |   +-- process            # Core processor loop
 +-- config/
-|   +-- accounts.yml       # IMAP credentials / account settings
+|   +-- accounts.yml       # IMAP account settings (gitignored)
+|   +-- accounts.yml.example
 |   +-- rules/             # One YAML per rule
 |       +-- bank-statements.yml
 |       +-- bank-notifications.yml
@@ -53,64 +54,109 @@ mail-workflows/
 |   +-- bank-statement.md
 |   +-- bank-notification.md
 +-- preprocessors/         # Small scripts, each does one thing
-|   +-- extract-pdf-text   # PDF attachment →plain text
-|   +-- strip-html         # HTML body →plain text
+|   +-- extract-pdf-text   # PDF attachment → plain text
+|   +-- strip-html         # HTML body → plain text
 |   +-- extract-headers    # Emit structured header summary
 +-- handlers/              # Post-processing / notification scripts
 |   +-- save-artifact      # Write output to artifacts/
-|   +-- notify-desktop     # macOS/Linux desktop notification
-|   +-- notify-slack       # Post to Slack webhook
+|   +-- notify-desktop     # macOS desktop notification
+|   +-- notify-telegram    # Send Telegram message
+|   +-- notify-email       # Send email notification
 +-- data/                  # gitignored
 |   +-- mail/              # Maildir storage
 |   |   +-- <account>/
 |   |       +-- new/       # Unprocessed emails
 |   |       +-- cur/       # Processed emails
 |   |       +-- tmp/       # Maildir temp (used by mbsync)
-|   +-- artifacts/         # AI-generated outputs
+|   +-- artifacts/         # Generated outputs
 |   +-- logs/              # Run logs
-+-- .mbsyncrc.template     # Template, rendered with account config
++-- .mbsyncrc.template     # Template, rendered from accounts.yml
 +-- setup                  # One-time setup script
 ```
 
 ## Component Details
 
-### Mail Sync —mbsync (isync)
+### Mail Sync — mbsync (isync)
 
 **Why mbsync:**
 - Battle-tested, actively maintained, available via Homebrew and apt
-- Native Maildir support —each message becomes a separate file
-- Supports Gmail labels via IMAP folder mapping
+- Native Maildir support — each message becomes a separate file
+- Works with any IMAP server (Gmail, Fastmail, self-hosted, etc.)
 - Idempotent: re-running after downtime just downloads what's new
-- Supports OAuth2 via external token command (future), or App Passwords
-  (simple start)
-
-**Gmail auth:** Start with App Passwords (available when 2FA is enabled).
-This avoids the OAuth2 dance for initial setup. Can add OAuth2 later as an
-optional upgrade path.
+- Supports multiple accounts
 
 **Config:** `.mbsyncrc` is generated from `config/accounts.yml` by the setup
 script. This keeps credentials out of the repo while making the config
 reproducible.
 
-### Processing Rules —YAML
+### Account Configuration
+
+```yaml
+# config/accounts.yml.example
+accounts:
+  personal:
+    host: imap.gmail.com
+    port: 993
+    user: user@gmail.com
+    pass_cmd: "security find-generic-password -s mail-workflows-personal -w"
+    tls: true
+    folders:
+      - INBOX
+  work:
+    host: imap.fastmail.com
+    port: 993
+    user: user@fastmail.com
+    pass_cmd: "security find-generic-password -s mail-workflows-work -w"
+    tls: true
+    folders:
+      - INBOX
+      - Receipts
+```
+
+Passwords are retrieved via an external command (`pass_cmd`), not stored in
+the config file. On macOS, use Keychain. On Linux, use `pass`, `secret-tool`,
+or a similar credential store.
+
+### Processing Rules — YAML
 
 ```yaml
 # config/rules/bank-statements.yml
 name: bank-statements
 match:
-  from: "statements@megabank.com"
-  subject: "Your Monthly Statement"
+  from: '/statements@(megabank|otherbank)\.com/'
+  subject: '/monthly statement/i'
   has_attachment: "*.pdf"
 preprocess:
   - extract-pdf-text
-prompt: bank-statement
-handlers:
+handler:
+  type: llm
+  model: claude-sonnet-4-20250514
+  prompt: bank-statement
+notify:
   - save-artifact
   - notify-desktop
+  - notify-telegram
 ```
 
-Rules are evaluated in order of filename. First match wins (or we could
-support multiple matches —TBD).
+```yaml
+# config/rules/order-confirmations.yml
+name: order-confirmations
+match:
+  from: '/noreply@shop\.example\.com/'
+  subject: '/order confirm/i'
+preprocess:
+  - strip-html
+handler:
+  type: script
+  command: preprocessors/extract-order-info
+notify:
+  - save-artifact
+```
+
+**Match fields:** `from` and `subject` support plain strings (substring
+match) or regexes (delimited with `/pattern/flags`).
+
+**Rules** are evaluated in filename order. First match wins.
 
 ### Preprocessors
 
@@ -118,29 +164,24 @@ Small standalone scripts. Each reads from stdin or a temp directory of
 extracted parts, writes to stdout. They are chained in the order specified
 by the rule.
 
-Examples:
 - **`extract-pdf-text`**: Uses `pdftotext` (poppler-utils) to convert PDF
-  attachments to plain text. Dramatically reduces tokens vs. feeding raw PDF.
-- **`strip-html`**: Converts HTML email body to plain text. Can use
-  `lynx -dump`, `w3m -dump`, or a simple script.
-- **`extract-headers`**: Emits a structured summary (From, To, Date, Subject)
-  for the prompt context.
+  attachments to plain text.
+- **`strip-html`**: Converts HTML email body to plain text.
+- **`extract-headers`**: Emits a structured summary (From, To, Date, Subject).
 
-### AI Agent
+### Handlers
 
-Two modes, configurable per rule:
+Each rule specifies a handler — either an LLM call or a plain script. The
+handler receives preprocessed email content and produces structured output.
 
-1. **Claude Code CLI** (non-interactive): `claude -p "prompt content"` —
-   good for tasks that benefit from tool use (file writing, web fetches, etc.)
-2. **Direct API call**: Simpler, cheaper for pure text-in/text-out tasks.
-   A small wrapper script calls the Anthropic API with the prompt template +
-   preprocessed email content.
-
-The prompt template is a Markdown file with placeholders:
+**LLM handler** (`type: llm`):
+- Calls the Anthropic API with the referenced prompt template
+- Model is configurable per rule
+- Prompt template is a Markdown file with `{{EMAIL_CONTENT}}` placeholder
 
 ```markdown
 # prompts/bank-statement.md
-You are analyzing a bank statement. Extract the following:
+You are analyzing a bank statement. Extract:
 - Statement period
 - Opening balance, closing balance
 - Total deposits, total withdrawals
@@ -153,24 +194,63 @@ Output as JSON.
 {{EMAIL_CONTENT}}
 ```
 
-### Handlers (Post-processing)
+**Script handler** (`type: script`):
+- Runs a local script with preprocessed content on stdin
+- Script writes structured output to stdout
 
-Each handler is a script that receives the AI output on stdin plus metadata
-via environment variables (`$RULE_NAME`, `$EMAIL_FROM`, `$EMAIL_SUBJECT`,
-`$EMAIL_DATE`, etc.).
+Both handler types must produce output in a standardized format:
+
+```json
+{
+  "summary": "One-line summary for notifications",
+  "body": "Detailed content (for artifacts, longer notifications)",
+  "data": { "...arbitrary structured data..." }
+}
+```
+
+The `summary` field is used by notification scripts. The `body` and `data`
+fields are written to artifacts.
+
+### Notifications
+
+Each rule can trigger multiple notification channels. Notification scripts
+receive the handler's JSON output on stdin plus metadata via environment
+variables (`$RULE_NAME`, `$EMAIL_FROM`, `$EMAIL_SUBJECT`, `$EMAIL_DATE`).
 
 - **`save-artifact`**: Writes to `data/artifacts/<rule>/<date>-<subject-slug>.json`
-- **`notify-desktop`**: Uses `osascript` on macOS, `notify-send` on Linux
-- **`notify-slack`**: Posts to a Slack webhook URL (from config)
+- **`notify-desktop`**: Uses `osascript` on macOS (terminal-notifier as
+  fallback), `notify-send` on Linux
+- **`notify-telegram`**: Sends message via Telegram Bot API (bot token and
+  chat ID from config)
+- **`notify-email`**: Sends email via configured SMTP (for forwarding
+  summaries to another address)
+
+Notification config (tokens, chat IDs, SMTP settings) lives in
+`config/accounts.yml` under a `notifications` key:
+
+```yaml
+notifications:
+  telegram:
+    bot_token_cmd: "security find-generic-password -s mail-workflows-tg -w"
+    chat_id: "123456789"
+  email:
+    smtp_host: smtp.gmail.com
+    smtp_port: 587
+    smtp_user: user@gmail.com
+    smtp_pass_cmd: "security find-generic-password -s mail-workflows-smtp -w"
+    from: user@gmail.com
+```
 
 ## State Management
 
-**No database.** Maildir's `new/` →`cur/` move is atomic (rename on the
-same filesystem) and is the only state transition. If processing fails mid-way:
+**No database.** Maildir's `new/` → `cur/` move is atomic (rename on the
+same filesystem) and is the only state transition. If processing fails:
 - The .eml stays in `new/`
 - Next run retries it
 - After N consecutive failures on the same message, move it to a `failed/`
   directory and log a warning
+
+Processed emails are kept in `cur/` indefinitely.
 
 A simple lockfile (`flock` on `data/.lock`) prevents concurrent runs.
 
@@ -179,17 +259,10 @@ A simple lockfile (`flock` on `data/.lock`) prevents concurrent runs.
 | Layer | Language | Rationale |
 |-------|----------|-----------|
 | Orchestration (`bin/run`, `bin/sync`) | Shell (bash) | Zero deps, portable, simple glue |
-| Email parsing + rule matching (`bin/process`) | Ruby | `mail` gem is excellent for .eml/MIME. Pre-installed on macOS. Clean scripting. |
+| Email parsing + rule matching (`bin/process`) | Ruby | `mail` gem handles .eml/MIME well |
 | Preprocessors | Shell / Ruby | Depends on task complexity |
-| AI wrapper | Shell or Ruby | Thin wrapper around CLI or API call |
-| Handlers | Shell | Simple I/O piping |
-
-**Alternative:** Python instead of Ruby. The `email` module is in stdlib
-(no gem install needed). Both are fine —this is a matter of preference.
-
-**Why not Go/Rust:** This is a scripting/glue system, not a high-performance
-service. The overhead of compilation and static typing isn't justified.
-Shell + Ruby/Python is the right weight class.
+| LLM wrapper | Ruby | Thin wrapper around Anthropic API |
+| Notification scripts | Shell / Ruby | Simple I/O |
 
 ## Setup & Deployment
 
@@ -199,11 +272,11 @@ git clone <repo> ~/mail-workflows
 cd ~/mail-workflows
 
 # 2. Install dependencies
-./setup                    # installs mbsync, pdftotext, etc. via brew/apt
+./setup                    # installs mbsync, pdftotext, ruby gems via brew/apt
 
 # 3. Configure
 cp config/accounts.yml.example config/accounts.yml
-$EDITOR config/accounts.yml   # add Gmail app password
+$EDITOR config/accounts.yml   # add IMAP credentials, notification tokens
 
 # 4. Schedule
 # setup script offers to install the cron entry:
@@ -211,7 +284,6 @@ $EDITOR config/accounts.yml   # add Gmail app password
 ```
 
 To replicate on another machine: clone repo, run setup, edit accounts.yml.
-That's it.
 
 ## Robustness
 
@@ -221,31 +293,5 @@ That's it.
 | Downtime / missed crons | mbsync fetches all accumulated mail; processor handles batch |
 | Processing failure | Email stays in `new/`, retried next run; moved to `failed/` after N retries |
 | Partial output | Artifacts written to temp file, renamed atomically on success |
-| Credential security | `accounts.yml` is gitignored; template checked in |
-| Large attachments | Preprocessors extract text; raw attachments not sent to AI |
-
-## Open Questions
-
-1. **Language choice: Ruby vs Python?** Both work well. Ruby's `mail` gem
-   has a slightly nicer API. Python's `email` is stdlib. Leaning Ruby unless
-   there is a preference.
-
-2. **Claude Code CLI vs. direct API?** CLI gives tool use but is heavier.
-   Direct API is simpler for pure text processing. Could support both,
-   selectable per rule.
-
-3. **Gmail auth: App Passwords vs. OAuth2?** App Passwords are simpler but
-   require 2FA. OAuth2 is more "proper" but needs token refresh
-   infrastructure. Suggest starting with App Passwords.
-
-4. **Notification channels?** Desktop notifications + file artifacts seem
-   like the minimum. Slack/email/other —which are needed?
-
-5. **Rule matching granularity?** Just from/subject patterns, or also Gmail
-   labels, body content, attachment filenames?
-
-6. **Multiple accounts?** The architecture supports it (Maildir per account,
-   mbsync channels), but is it needed from day one?
-
-7. **Email retention policy?** Keep all processed emails in `cur/` forever,
-   or prune after N days?
+| Credential security | `accounts.yml` is gitignored; passwords via external commands |
+| Large attachments | Preprocessors extract text; raw attachments not sent to LLM |
