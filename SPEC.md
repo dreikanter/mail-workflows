@@ -9,7 +9,7 @@ producing artifacts and notifications.
 ## Design Principles
 
 - **Maildir as the source of truth.** Each email is a file. No databases.
-  State tracking uses Maildir's own `new/` -> `cur/` convention.
+  State tracking uses Maildir's own `new/` →`cur/` convention.
 - **Cron as the scheduler.** No long-running daemons. A single cron entry
   runs sync + process. Missed runs just mean a bigger batch next time.
 - **Repo = config.** The git repo contains all scripts, rules, and prompt
@@ -23,7 +23,7 @@ producing artifacts and notifications.
 cron (every N minutes)
   +-- run
       +-- 1. acquire lock (flock, skip if already running)
-      +-- 2. sync: mbsync pulls new mail -> Maildir new/
+      +-- 2. sync: mbsync pulls new mail →Maildir new/
       +-- 3. process: for each .eml in new/
               +-- match against rules (from, subject, labels)
               +-- preprocess (extract PDF text, strip HTML, etc.)
@@ -33,7 +33,7 @@ cron (every N minutes)
 ```
 
 After downtime, cron fires, mbsync fetches all accumulated mail, and the
-processor handles the entire batch. No special catch-up logic needed -- this
+processor handles the entire batch. No special catch-up logic needed —this
 falls out naturally from Maildir semantics.
 
 ## Directory Layout
@@ -41,7 +41,7 @@ falls out naturally from Maildir semantics.
 ```
 mail-workflows/
 +-- bin/
-|   +-- run                # Entry point (lock -> sync -> process)
+|   +-- run                # Entry point (lock →sync →process)
 |   +-- sync               # Wraps mbsync
 |   +-- process            # Core processor loop
 +-- config/
@@ -53,8 +53,8 @@ mail-workflows/
 |   +-- bank-statement.md
 |   +-- bank-notification.md
 +-- preprocessors/         # Small scripts, each does one thing
-|   +-- extract-pdf-text   # PDF attachment -> plain text
-|   +-- strip-html         # HTML body -> plain text
+|   +-- extract-pdf-text   # PDF attachment →plain text
+|   +-- strip-html         # HTML body →plain text
 |   +-- extract-headers    # Emit structured header summary
 +-- handlers/              # Post-processing / notification scripts
 |   +-- save-artifact      # Write output to artifacts/
@@ -74,11 +74,11 @@ mail-workflows/
 
 ## Component Details
 
-### Mail Sync -- mbsync (isync)
+### Mail Sync —mbsync (isync)
 
 **Why mbsync:**
 - Battle-tested, actively maintained, available via Homebrew and apt
-- Native Maildir support -- each message becomes a separate file
+- Native Maildir support —each message becomes a separate file
 - Supports Gmail labels via IMAP folder mapping
 - Idempotent: re-running after downtime just downloads what's new
 - Supports OAuth2 via external token command (future), or App Passwords
@@ -92,7 +92,7 @@ optional upgrade path.
 script. This keeps credentials out of the repo while making the config
 reproducible.
 
-### Processing Rules -- YAML
+### Processing Rules —YAML
 
 ```yaml
 # config/rules/bank-statements.yml
@@ -110,7 +110,7 @@ handlers:
 ```
 
 Rules are evaluated in order of filename. First match wins (or we could
-support multiple matches -- TBD).
+support multiple matches —TBD).
 
 ### Preprocessors
 
@@ -130,7 +130,7 @@ Examples:
 
 Two modes, configurable per rule:
 
-1. **Claude Code CLI** (non-interactive): `claude -p "prompt content"` --
+1. **Claude Code CLI** (non-interactive): `claude -p "prompt content"` —
    good for tasks that benefit from tool use (file writing, web fetches, etc.)
 2. **Direct API call**: Simpler, cheaper for pure text-in/text-out tasks.
    A small wrapper script calls the Anthropic API with the prompt template +
@@ -165,7 +165,7 @@ via environment variables (`$RULE_NAME`, `$EMAIL_FROM`, `$EMAIL_SUBJECT`,
 
 ## State Management
 
-**No database.** Maildir's `new/` -> `cur/` move is atomic (rename on the
+**No database.** Maildir's `new/` →`cur/` move is atomic (rename on the
 same filesystem) and is the only state transition. If processing fails mid-way:
 - The .eml stays in `new/`
 - Next run retries it
@@ -185,7 +185,7 @@ A simple lockfile (`flock` on `data/.lock`) prevents concurrent runs.
 | Handlers | Shell | Simple I/O piping |
 
 **Alternative:** Python instead of Ruby. The `email` module is in stdlib
-(no gem install needed). Both are fine -- this is a matter of preference.
+(no gem install needed). Both are fine —this is a matter of preference.
 
 **Why not Go/Rust:** This is a scripting/glue system, not a high-performance
 service. The overhead of compilation and static typing isn't justified.
@@ -239,7 +239,7 @@ That's it.
    infrastructure. Suggest starting with App Passwords.
 
 4. **Notification channels?** Desktop notifications + file artifacts seem
-   like the minimum. Slack/email/other -- which are needed?
+   like the minimum. Slack/email/other —which are needed?
 
 5. **Rule matching granularity?** Just from/subject patterns, or also Gmail
    labels, body content, attachment filenames?
