@@ -60,4 +60,22 @@ accounts:
 
 On Linux, use `pass`, `secret-tool`, or any command that prints the password to stdout.
 
+### Gmail
+
+Gmail requires an App Password for IMAP access:
+
+1. Generate an App Password at https://myaccount.google.com/apppasswords (select "Mail")
+2. Store the password in Keychain (omit spaces, `aaaa bbbb cccc dddd` → `aaaabbbbccccdddd`):
+
+```bash
+security add-generic-password -s mail-workflows-personal -a "$USER" -w "your-app-password"
+```
+
+To update an existing password, delete and re-add:
+
+```bash
+security delete-generic-password -s mail-workflows-personal
+security add-generic-password -s mail-workflows-personal -a "$USER" -w "new-app-password"
+```
+
 See [SPEC.md](SPEC.md) for details.
