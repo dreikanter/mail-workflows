@@ -195,6 +195,37 @@ class NormalizerTest < Minitest::Test
     assert_includes content, "Hello base64 world"
   end
 
+  def test_decodes_percent_encoded_attachment_filenames
+    mail = Mail.new do
+      from    "a@example.com"
+      to      "b@example.com"
+      subject "Encoded Attachment"
+    end
+    mail.text_part = Mail::Part.new(body: "See attached.")
+    att = Mail::Part.new
+    att.content_type = 'application/pdf; name="FD-POS%2b260228%2b2%2b1%2b159237%2bmusaev.dtd.pdf"'
+    att.content_disposition = 'attachment; filename="FD-POS%2b260228%2b2%2b1%2b159237%2bmusaev.dtd.pdf"'
+    att.body = "fake pdf"
+    mail.add_part(att)
+    path = write_eml(mail.to_s)
+
+    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    stem = File.basename(md_path, ".md")
+    att_dir = File.join(@tmpdir, "attachments", stem)
+
+    # Parse attachment names from frontmatter
+    content = File.read(md_path)
+    frontmatter = YAML.safe_load(content.split("---\n")[1])
+    listed_names = frontmatter["attachments"]
+
+    assert_equal ["FD-POS+260228+2+1+159237+musaev.dtd.pdf"], listed_names
+    # Every name in frontmatter must exist on disk
+    listed_names.each do |name|
+      assert File.exist?(File.join(att_dir, name)),
+             "frontmatter attachment '#{name}' should exist on disk"
+    end
+  end
+
   def test_handles_duplicate_attachment_names
     eml = build_eml(
       from: "a@example.com",

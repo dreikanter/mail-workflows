@@ -4,6 +4,7 @@ require "mail"
 require "reverse_markdown"
 require "yaml"
 require "digest"
+require "cgi"
 require "fileutils"
 require "time"
 require_relative "slug"
@@ -183,7 +184,11 @@ module MailWorkflows
     end
 
     def attachment_filename(attachment)
-      attachment.filename || "attachment"
+      name = attachment.filename || "attachment"
+      # Decode percent-encoded characters (e.g., %2b → +) common in MIME
+      # filenames. Protect literal "+" first since CGI.unescape treats it
+      # as space (HTML form convention), but in filenames "+" is literal.
+      CGI.unescape(name.gsub("+", "%2B"))
     end
 
     def extract_attachments(msg, stem)
