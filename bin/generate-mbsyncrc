@@ -55,7 +55,7 @@ File.open(rc_path, "w", 0o600) do |f|
   end
 end
 
-warn "Generated #{rc_path}"
+$stderr.puts "Generated #{rc_path}"
 
 # Ensure Maildir directories
 accounts.each do |name, acct|
@@ -65,4 +65,4 @@ accounts.each do |name, acct|
   end
 end
 
-warn "Maildir directories ready"
+$stderr.puts "Maildir directories ready"
