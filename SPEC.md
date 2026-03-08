@@ -32,11 +32,12 @@ cron (every N minutes)
       |       +-- write markdown + YAML frontmatter → normalized/
       |       +-- extract attachments → attachments/
       |       +-- move .eml to cur/ (marks as synced)
-      +-- 4. process: for each normalized .md
+      +-- 4. process: for each normalized .md in new/
               +-- match against rules (from, subject regex)
-              +-- preprocess (extract PDF text, strip HTML, etc.)
+              +-- preprocess (extract PDF text, etc.)
               +-- handle: run script or LLM with matched prompt
               +-- deliver artifacts / send notifications
+              +-- move .md to processed/
 ```
 
 After downtime, cron fires, mbsync fetches all accumulated mail, and the
@@ -56,8 +57,6 @@ mail-workflows/
 |   +-- init               # One-time data dir initialization
 +-- preprocessors/         # Small scripts, each does one thing
 |   +-- extract-pdf-text   # PDF attachment → plain text
-|   +-- strip-html         # HTML body → plain text
-|   +-- extract-headers    # Emit structured header summary
 +-- handlers/              # Post-processing / notification scripts
 |   +-- save-artifact      # Write output to artifacts/
 |   +-- notify-desktop     # macOS desktop notification
@@ -93,6 +92,8 @@ mail-workflows/
 |           +-- tmp/       # Maildir temp (used by mbsync)
 +-- normalized/            # Plain-text markdown copies (LLM-ready)
 |   +-- <account>/
+|       +-- new/           # Normalized, not yet processed by rules
+|       +-- processed/     # Processed by rules (or unmatched)
 |       +-- <timestamp>_<subject-slug>.md
 +-- attachments/           # Extracted binary attachments
 |   +-- <timestamp>_<subject-slug>/
@@ -174,8 +175,6 @@ name: order-confirmations
 match:
   from: '/noreply@shop\.example\.com/'
   subject: '/order confirm/i'
-preprocess:
-  - strip-html
 handler:
   type: script
   command: preprocessors/extract-order-info
@@ -183,8 +182,9 @@ notify:
   - save-artifact
 ```
 
-**Match fields:** `from` and `subject` support plain strings (substring
-match) or regexes (delimited with `/pattern/flags`).
+**Match fields:** `from`, `subject`, and `has_attachment` are matched
+against the normalized markdown frontmatter. `from` and `subject` support
+plain strings (substring match) or regexes (delimited with `/pattern/flags`).
 
 **Rules** are evaluated in filename order. First match wins.
 
@@ -196,8 +196,9 @@ by the rule.
 
 - **`extract-pdf-text`**: Uses `pdftotext` (poppler-utils) to convert PDF
   attachments to plain text.
-- **`strip-html`**: Converts HTML email body to plain text.
-- **`extract-headers`**: Emits a structured summary (From, To, Date, Subject).
+
+Note: HTML-to-Markdown conversion and header extraction are handled by the
+normalization step — they are not needed as separate preprocessors.
 
 ### Handlers
 
@@ -287,8 +288,11 @@ under `$MAIL_WORKFLOWS_HOME`:
 
 ```
 normalized/<account>/
-  20260308-143022_invoice-from-acme.md
-  20260308-143022_weekly-report.md
+  new/
+    20260308-143022_invoice-from-acme.md
+    20260308-143022_weekly-report.md
+  processed/
+    20260307-091500_meeting-notes.md
 
 attachments/
   20260308-143022_invoice-from-acme/
@@ -298,7 +302,9 @@ attachments/
     report.xlsx
 ```
 
-Messages without attachments get no attachments directory.
+Normalization writes to `new/`. After rule processing (matched or not),
+the `.md` file moves to `processed/`. Messages without attachments get
+no attachments directory.
 
 **Filename format:** `YYYYMMDD-HHMMSS_<subject-slug>[_<suffix>].md`
 
@@ -363,15 +369,20 @@ and writes the markdown + attachment files.
 
 ## State Management
 
-**No database.** State transitions use Maildir's own directory conventions:
+**No database.** State transitions use directory conventions:
 
-1. mbsync delivers mail to `new/`
-2. Normalization creates markdown + attachments, then moves `.eml` to `cur/`
-3. Processing (rule matching, handlers) operates on normalized files
+1. mbsync delivers raw `.eml` to `mail/<account>/<folder>/new/`
+2. Normalization writes `.md` to `normalized/<account>/new/`, then moves
+   `.eml` to `mail/<account>/<folder>/cur/`
+3. Processing reads from `normalized/<account>/new/`, runs rules, then
+   moves `.md` to `normalized/<account>/processed/`
 
-If normalization fails, the `.eml` stays in `new/` and is retried next run.
-After N consecutive failures on the same message, move it to `failed/`
-and log a warning.
+All state transitions are atomic renames on the same filesystem.
+
+If normalization fails, the `.eml` stays in `mail/…/new/` and is retried
+next run. If processing fails, the `.md` stays in `normalized/…/new/`
+and is retried next run. After N consecutive failures on the same message,
+move it to a `failed/` directory and log a warning.
 
 Processed emails are kept in `cur/` indefinitely.
 
