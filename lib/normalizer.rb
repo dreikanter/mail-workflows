@@ -25,9 +25,23 @@ module MailWorkflows
 
       return nil if already_normalized?(account, message_id)
 
-      stem = build_stem(msg, account)
+      body = extract_body(msg)
+      fwd = parse_forwarded_header(body)
+      if fwd
+        fwd[:date] ||= extract_date(msg)
+        fwd[:forwarded_by] = format_address(msg[:from])
+        fwd[:forwarded_date] = extract_date(msg)
+        body = fwd[:body]
+      else
+        fwd = detect_header_forwarding(msg)
+      end
+
+      stem = build_stem(msg, account, fwd: fwd)
       filenames = extract_attachments(msg, stem)
-      md_path = write_markdown(msg, stem, account, folder, message_id, filenames)
+      md_path = write_markdown(
+        msg, stem, account, folder, message_id, filenames,
+        body: body, fwd: fwd
+      )
       md_path
     end
 
@@ -57,10 +71,11 @@ module MailWorkflows
       false
     end
 
-    def build_stem(msg, account)
-      date = extract_date(msg)
+    def build_stem(msg, account, fwd: nil)
+      date = fwd&.dig(:date) || extract_date(msg)
       timestamp = date.strftime("%Y%m%d-%H%M%S")
-      slug = Slug.slugify(msg.subject)
+      subject = fwd&.dig(:subject) || msg.subject
+      slug = Slug.slugify(subject)
       base_stem = "#{timestamp}_#{slug}"
 
       # Check for collision and add suffix if needed
@@ -89,27 +104,32 @@ module MailWorkflows
       Time.now
     end
 
-    def write_markdown(msg, stem, account, folder, message_id, attachment_filenames)
+    def write_markdown(msg, stem, account, folder, message_id, attachment_filenames, body: nil, fwd: nil)
       out_dir = File.join(normalized_dir(account), "new")
       FileUtils.mkdir_p(out_dir)
 
-      frontmatter = build_frontmatter(msg, folder, message_id, attachment_filenames)
-      body = extract_body(msg)
+      frontmatter = build_frontmatter(msg, folder, message_id, attachment_filenames, fwd: fwd)
+      body ||= extract_body(msg)
 
       md_path = File.join(out_dir, "#{stem}.md")
       File.write(md_path, "#{frontmatter}\n#{body}\n")
       md_path
     end
 
-    def build_frontmatter(msg, folder, message_id, attachment_filenames)
+    def build_frontmatter(msg, folder, message_id, attachment_filenames, fwd: nil)
       data = {
         "message_id" => message_id,
-        "from" => format_address(msg[:from]),
-        "to" => format_address(msg[:to]),
-        "subject" => msg.subject || "",
-        "date" => extract_date(msg).iso8601,
+        "from" => fwd&.dig(:from) || format_address(msg[:from]),
+        "to" => fwd&.dig(:to) || format_address(msg[:to]),
+        "subject" => fwd&.dig(:subject) || msg.subject || "",
+        "date" => (fwd&.dig(:date) || extract_date(msg)).iso8601,
         "folder" => folder
       }
+
+      if fwd
+        data["forwarded_by"] = fwd[:forwarded_by]
+        data["forwarded_date"] = fwd[:forwarded_date].iso8601 if fwd[:forwarded_date]
+      end
 
       data["attachments"] = attachment_filenames unless attachment_filenames.empty?
 
@@ -169,6 +189,72 @@ module MailWorkflows
       text.sub(/\n-- \n.*\z/m, "")
     end
 
+    FORWARDED_MARKER_RE = /\A-{3,}\s*(?:Forwarded message|Original message)\s*-{3,}\z/
+
+    def parse_forwarded_header(text)
+      lines = text.split("\n")
+      marker_idx = lines.index { |l| l.strip.match?(FORWARDED_MARKER_RE) }
+      return nil unless marker_idx
+
+      fields = {}
+      body_start = marker_idx + 1
+
+      (marker_idx + 1...lines.length).each do |i|
+        line = lines[i].strip
+        if line.empty?
+          if fields.any?
+            body_start = i + 1
+            break
+          end
+          next
+        end
+
+        case line
+        when /\AFrom:\s+(.*)/    then fields[:from] = $1.strip
+        when /\ADate:\s+(.*)/    then fields[:date_str] = $1.strip
+        when /\ASubject:\s+(.*)/ then fields[:subject] = $1.strip
+        when /\ATo:\s+(.*)/      then fields[:to] = $1.strip
+        else
+          body_start = i
+          break
+        end
+      end
+
+      return nil if fields.empty?
+
+      before = lines[0...marker_idx].join("\n").strip
+      after = lines[body_start..].join("\n").strip
+      body = [before, after].reject(&:empty?).join("\n\n")
+
+      date = parse_forwarded_date(fields[:date_str]) if fields[:date_str]
+
+      {
+        from: fields[:from] || "",
+        to: fields[:to] || "",
+        subject: fields[:subject] || "",
+        date: date,
+        body: body
+      }
+    end
+
+    def parse_forwarded_date(date_str)
+      cleaned = date_str
+        .gsub(/\s+at\s+/, " ")
+        .gsub(/[\u202F\u00A0]/, " ")
+        .squeeze(" ")
+        .strip
+      Time.parse(cleaned)
+    rescue ArgumentError
+      nil
+    end
+
+    def detect_header_forwarding(msg)
+      forwarded_for = msg["X-Forwarded-For"]&.to_s&.strip
+      return nil if forwarded_for.nil? || forwarded_for.empty?
+
+      { forwarded_by: forwarded_for }
+    end
+
     def all_attachments(msg)
       return [] unless msg.multipart?
 
@@ -187,7 +273,8 @@ module MailWorkflows
       # Decode percent-encoded characters (e.g., %2b → +) common in MIME
       # filenames. Protect literal "+" first since CGI.unescape treats it
       # as space (HTML form convention), but in filenames "+" is literal.
-      CGI.unescape(name.gsub("+", "%2B"))
+      # Then sanitize "+" to "-" to avoid shell/URL issues.
+      CGI.unescape(name.gsub("+", "%2B")).tr("+", "-")
     end
 
     def extract_attachments(msg, stem)
