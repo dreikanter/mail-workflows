@@ -78,4 +78,18 @@ security delete-generic-password -s mail-workflows-personal
 security add-generic-password -s mail-workflows-personal -a "$USER" -w "new-app-password"
 ```
 
+## Development
+
+Install dependencies:
+
+```bash
+bundle install
+```
+
+Run tests:
+
+```bash
+bundle exec rake
+```
+
 See [SPEC.md](SPEC.md) for details.

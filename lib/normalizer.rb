@@ -4,6 +4,7 @@ require "mail"
 require "reverse_markdown"
 require "yaml"
 require "digest"
+require "cgi"
 require "fileutils"
 require "time"
 require_relative "slug"
@@ -25,8 +26,8 @@ module MailWorkflows
       return nil if already_normalized?(account, message_id)
 
       stem = build_stem(msg, account)
-      md_path = write_markdown(msg, stem, account, folder, message_id)
-      extract_attachments(msg, stem)
+      filenames = extract_attachments(msg, stem)
+      md_path = write_markdown(msg, stem, account, folder, message_id, filenames)
       md_path
     end
 
@@ -88,11 +89,11 @@ module MailWorkflows
       Time.now
     end
 
-    def write_markdown(msg, stem, account, folder, message_id)
+    def write_markdown(msg, stem, account, folder, message_id, attachment_filenames)
       out_dir = File.join(normalized_dir(account), "new")
       FileUtils.mkdir_p(out_dir)
 
-      frontmatter = build_frontmatter(msg, folder, message_id)
+      frontmatter = build_frontmatter(msg, folder, message_id, attachment_filenames)
       body = extract_body(msg)
 
       md_path = File.join(out_dir, "#{stem}.md")
@@ -100,7 +101,7 @@ module MailWorkflows
       md_path
     end
 
-    def build_frontmatter(msg, folder, message_id)
+    def build_frontmatter(msg, folder, message_id, attachment_filenames)
       data = {
         "message_id" => message_id,
         "from" => format_address(msg[:from]),
@@ -110,8 +111,7 @@ module MailWorkflows
         "folder" => folder
       }
 
-      attachment_names = all_attachments(msg).map { |a| attachment_filename(a) }
-      data["attachments"] = attachment_names unless attachment_names.empty?
+      data["attachments"] = attachment_filenames unless attachment_filenames.empty?
 
       "---\n#{YAML.dump(data).sub(/\A---\n/, "")}---\n"
     end
@@ -183,16 +183,21 @@ module MailWorkflows
     end
 
     def attachment_filename(attachment)
-      attachment.filename || "attachment"
+      name = attachment.filename || "attachment"
+      # Decode percent-encoded characters (e.g., %2b → +) common in MIME
+      # filenames. Protect literal "+" first since CGI.unescape treats it
+      # as space (HTML form convention), but in filenames "+" is literal.
+      CGI.unescape(name.gsub("+", "%2B"))
     end
 
     def extract_attachments(msg, stem)
       attachments = all_attachments(msg)
-      return if attachments.empty?
+      return [] if attachments.empty?
 
       out_dir = File.join(attachments_dir, stem)
       FileUtils.mkdir_p(out_dir)
 
+      filenames = []
       name_counts = Hash.new(0)
       attachments.each do |att|
         name = attachment_filename(att)
@@ -200,7 +205,9 @@ module MailWorkflows
         name = deduplicate_filename(name, name_counts[name]) if name_counts[name] > 1
 
         File.binwrite(File.join(out_dir, name), att.decoded)
+        filenames << name
       end
+      filenames
     end
 
     def deduplicate_filename(name, count)
