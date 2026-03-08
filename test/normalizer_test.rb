@@ -203,8 +203,8 @@ class NormalizerTest < Minitest::Test
     end
     mail.text_part = Mail::Part.new(body: "See attached.")
     att = Mail::Part.new
-    att.content_type = 'application/pdf; name="FD-POS%2b260228%2b2%2b1%2b159237%2bmusaev.dtd.pdf"'
-    att.content_disposition = 'attachment; filename="FD-POS%2b260228%2b2%2b1%2b159237%2bmusaev.dtd.pdf"'
+    att.content_type = 'application/pdf; name="FD-POS%2b260228%2b2%2b1%2b159237%2baccount.pdf"'
+    att.content_disposition = 'attachment; filename="FD-POS%2b260228%2b2%2b1%2b159237%2baccount.pdf"'
     att.body = "fake pdf"
     mail.add_part(att)
     path = write_eml(mail.to_s)
@@ -218,7 +218,7 @@ class NormalizerTest < Minitest::Test
     frontmatter = YAML.safe_load(content.split("---\n")[1])
     listed_names = frontmatter["attachments"]
 
-    assert_equal ["FD-POS-260228-2-1-159237-musaev.dtd.pdf"], listed_names
+    assert_equal ["FD-POS-260228-2-1-159237-account.pdf"], listed_names
     # Every name in frontmatter must exist on disk
     listed_names.each do |name|
       assert File.exist?(File.join(att_dir, name)),
@@ -328,10 +328,10 @@ class NormalizerTest < Minitest::Test
 
   def test_forwarded_message_extracts_original_info
     eml = build_forwarded_eml(
-      forwarder_from: "Alex Musayev <alex@gmail.com>",
-      forwarder_to: "workflows@musayev.com",
-      original_from: "Orion telekom <no-reply@oriontelekom.rs>",
-      original_to: "<alex@gmail.com>, <other@example.com>",
+      forwarder_from: "Jane Doe <jane@example.com>",
+      forwarder_to: "inbox@example.net",
+      original_from: "Acme Corp <no-reply@acme.example.com>",
+      original_to: "<jane@example.com>, <other@example.com>",
       original_date: "Tue, Mar 3, 2026 at 12:31 PM",
       original_subject: "Monthly Invoice",
       body: "Your invoice is attached."
@@ -343,20 +343,20 @@ class NormalizerTest < Minitest::Test
     content = File.read(md_path)
     frontmatter = YAML.safe_load(content.split("---\n")[1])
 
-    assert_equal "Orion telekom <no-reply@oriontelekom.rs>", frontmatter["from"]
-    assert_equal "<alex@gmail.com>, <other@example.com>", frontmatter["to"]
+    assert_equal "Acme Corp <no-reply@acme.example.com>", frontmatter["from"]
+    assert_equal "<jane@example.com>, <other@example.com>", frontmatter["to"]
     assert_equal "Monthly Invoice", frontmatter["subject"]
     assert_match(/\A2026-03-03T12:31:00/, frontmatter["date"])
-    assert_match(/Alex Musayev <alex@gmail.com>/, frontmatter["forwarded_by"])
+    assert_match(/Jane Doe <jane@example.com>/, frontmatter["forwarded_by"])
     assert frontmatter["forwarded_date"]
   end
 
   def test_forwarded_message_strips_header_block
     eml = build_forwarded_eml(
-      forwarder_from: "alex@gmail.com",
-      forwarder_to: "workflows@musayev.com",
+      forwarder_from: "jane@example.com",
+      forwarder_to: "inbox@example.net",
       original_from: "sender@example.com",
-      original_to: "alex@gmail.com",
+      original_to: "jane@example.com",
       original_date: "Mon, Mar 2, 2026 at 10:00 AM",
       original_subject: "Test",
       body: "Actual content here."
@@ -373,10 +373,10 @@ class NormalizerTest < Minitest::Test
 
   def test_forwarded_message_slug_uses_original_subject
     eml = build_forwarded_eml(
-      forwarder_from: "alex@gmail.com",
-      forwarder_to: "workflows@musayev.com",
+      forwarder_from: "jane@example.com",
+      forwarder_to: "inbox@example.net",
       original_from: "sender@example.com",
-      original_to: "alex@gmail.com",
+      original_to: "jane@example.com",
       original_date: "Mon, Mar 2, 2026 at 10:00 AM",
       original_subject: "Original Topic",
       body: "Content."
@@ -390,10 +390,10 @@ class NormalizerTest < Minitest::Test
 
   def test_forwarded_message_uses_original_date_in_stem
     eml = build_forwarded_eml(
-      forwarder_from: "alex@gmail.com",
-      forwarder_to: "workflows@musayev.com",
+      forwarder_from: "jane@example.com",
+      forwarder_to: "inbox@example.net",
       original_from: "sender@example.com",
-      original_to: "alex@gmail.com",
+      original_to: "jane@example.com",
       original_date: "Mon, Mar 2, 2026 at 10:00 AM",
       original_subject: "Dated Email",
       body: "Content."
@@ -407,10 +407,10 @@ class NormalizerTest < Minitest::Test
 
   def test_forwarded_date_with_narrow_non_breaking_space
     eml = build_forwarded_eml(
-      forwarder_from: "alex@gmail.com",
-      forwarder_to: "workflows@musayev.com",
+      forwarder_from: "jane@example.com",
+      forwarder_to: "inbox@example.net",
       original_from: "sender@example.com",
-      original_to: "alex@gmail.com",
+      original_to: "jane@example.com",
       original_date: "Tue, Mar 3, 2026 at 12:31\u202FPM",
       original_subject: "NNBSP Date",
       body: "Content."
@@ -426,10 +426,10 @@ class NormalizerTest < Minitest::Test
 
   def test_forwarded_message_with_attachments
     eml = build_forwarded_eml(
-      forwarder_from: "alex@gmail.com",
-      forwarder_to: "workflows@musayev.com",
+      forwarder_from: "jane@example.com",
+      forwarder_to: "inbox@example.net",
       original_from: "billing@example.com",
-      original_to: "alex@gmail.com",
+      original_to: "jane@example.com",
       original_date: "Wed, Mar 4, 2026 at 9:00 AM",
       original_subject: "Invoice",
       body: "See attached.",
@@ -471,7 +471,7 @@ class NormalizerTest < Minitest::Test
       body    "This was auto-forwarded."
     end
     mail["X-Forwarded-For"] = "recipient@example.com"
-    mail["X-Forwarded-To"] = "workflows@musayev.com"
+    mail["X-Forwarded-To"] = "inbox@example.net"
     path = write_eml(mail.to_s)
 
     md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
@@ -498,7 +498,7 @@ class NormalizerTest < Minitest::Test
 
     mail = Mail.new do
       from    "middle@example.com"
-      to      "workflows@musayev.com"
+      to      "inbox@example.net"
       subject "Fwd: Original"
       body    fwd_body
     end
