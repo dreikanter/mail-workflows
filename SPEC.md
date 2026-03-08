@@ -12,8 +12,11 @@ producing artifacts and notifications.
   State tracking uses Maildir's own `new/` → `cur/` convention.
 - **Cron as the scheduler.** No long-running daemons. A single cron entry
   runs sync + process. Missed runs just mean a bigger batch next time.
-- **Repo = config.** The git repo contains all scripts, rules, and prompt
-  templates. Clone it, add credentials, add one cron line, done.
+- **Tool ≠ data.** The git repo is the tool: scripts, preprocessors,
+  handlers. User data and configuration live in a separate directory
+  (`~/.mail-workflows/` by default, override with `$MAIL_WORKFLOWS_HOME`).
+  The tool is easy to install and update (`git pull`); user data is easy
+  to backup and never touches GitHub.
 - **Unix philosophy.** Small composable scripts. Shell for orchestration,
   Ruby for email parsing and processing logic.
 
@@ -38,21 +41,14 @@ falls out naturally from Maildir semantics.
 
 ## Directory Layout
 
+**Tool (git repo):**
+
 ```
 mail-workflows/
 +-- bin/
 |   +-- run                # Entry point (lock → sync → process)
 |   +-- sync               # Wraps mbsync
 |   +-- process            # Core processor loop
-+-- config/
-|   +-- accounts.yml       # IMAP account settings (gitignored)
-|   +-- accounts.yml.example
-|   +-- rules/             # One YAML per rule
-|       +-- bank-statements.yml
-|       +-- bank-notifications.yml
-+-- prompts/
-|   +-- bank-statement.md
-|   +-- bank-notification.md
 +-- preprocessors/         # Small scripts, each does one thing
 |   +-- extract-pdf-text   # PDF attachment → plain text
 |   +-- strip-html         # HTML body → plain text
@@ -62,17 +58,40 @@ mail-workflows/
 |   +-- notify-desktop     # macOS desktop notification
 |   +-- notify-telegram    # Send Telegram message
 |   +-- notify-email       # Send email notification
-+-- data/                  # gitignored
-|   +-- mail/              # Maildir storage
-|   |   +-- <account>/
-|   |       +-- new/       # Unprocessed emails
-|   |       +-- cur/       # Processed emails
-|   |       +-- tmp/       # Maildir temp (used by mbsync)
-|   +-- artifacts/         # Generated outputs
-|   +-- logs/              # Run logs
++-- defaults/              # Shipped defaults, copied on first setup
+|   +-- accounts.yml.example
+|   +-- rules/
+|   |   +-- bank-statements.yml
+|   |   +-- bank-notifications.yml
+|   +-- prompts/
+|       +-- bank-statement.md
+|       +-- bank-notification.md
 +-- .mbsyncrc.template     # Template, rendered from accounts.yml
 +-- setup                  # One-time setup script
 ```
+
+**User data (`$MAIL_WORKFLOWS_HOME`, default `~/.mail-workflows/`):**
+
+```
+~/.mail-workflows/
++-- accounts.yml           # IMAP accounts, notification settings
++-- rules/                 # One YAML per rule
+|   +-- bank-statements.yml
+|   +-- bank-notifications.yml
++-- prompts/               # Prompt templates referenced by rules
+|   +-- bank-statement.md
+|   +-- bank-notification.md
++-- mail/                  # Maildir storage
+|   +-- <account>/
+|       +-- new/           # Unprocessed emails
+|       +-- cur/           # Processed emails
+|       +-- tmp/           # Maildir temp (used by mbsync)
++-- artifacts/             # Generated outputs
++-- logs/                  # Run logs
+```
+
+The `setup` script creates `$MAIL_WORKFLOWS_HOME` and copies default
+rules and prompts from `defaults/` if no user config exists yet.
 
 ## Component Details
 
@@ -85,14 +104,13 @@ mail-workflows/
 - Idempotent: re-running after downtime just downloads what's new
 - Supports multiple accounts
 
-**Config:** `.mbsyncrc` is generated from `config/accounts.yml` by the setup
-script. This keeps credentials out of the repo while making the config
-reproducible.
+**Config:** `.mbsyncrc` is generated from `$MAIL_WORKFLOWS_HOME/accounts.yml`
+by the setup script. Credentials never touch the repo.
 
 ### Account Configuration
 
 ```yaml
-# config/accounts.yml.example
+# ~/.mail-workflows/accounts.yml
 accounts:
   personal:
     host: imap.gmail.com
@@ -120,7 +138,7 @@ or a similar credential store.
 ### Processing Rules — YAML
 
 ```yaml
-# config/rules/bank-statements.yml
+# ~/.mail-workflows/rules/bank-statements.yml
 name: bank-statements
 match:
   from: '/statements@(megabank|otherbank)\.com/'
@@ -139,7 +157,7 @@ notify:
 ```
 
 ```yaml
-# config/rules/order-confirmations.yml
+# ~/.mail-workflows/rules/order-confirmations.yml
 name: order-confirmations
 match:
   from: '/noreply@shop\.example\.com/'
@@ -180,7 +198,7 @@ handler receives preprocessed email content and produces structured output.
 - Prompt template is a Markdown file with `{{EMAIL_CONTENT}}` placeholder
 
 ```markdown
-# prompts/bank-statement.md
+# ~/.mail-workflows/prompts/bank-statement.md
 You are analyzing a bank statement. Extract:
 - Statement period
 - Opening balance, closing balance
@@ -217,7 +235,7 @@ Each rule can trigger multiple notification channels. Notification scripts
 receive the handler's JSON output on stdin plus metadata via environment
 variables (`$RULE_NAME`, `$EMAIL_FROM`, `$EMAIL_SUBJECT`, `$EMAIL_DATE`).
 
-- **`save-artifact`**: Writes to `data/artifacts/<rule>/<date>-<subject-slug>.json`
+- **`save-artifact`**: Writes to `$MAIL_WORKFLOWS_HOME/artifacts/<rule>/<date>-<subject-slug>.json`
 - **`notify-desktop`**: Uses `osascript` on macOS (terminal-notifier as
   fallback), `notify-send` on Linux
 - **`notify-telegram`**: Sends message via Telegram Bot API (bot token and
@@ -226,7 +244,7 @@ variables (`$RULE_NAME`, `$EMAIL_FROM`, `$EMAIL_SUBJECT`, `$EMAIL_DATE`).
   summaries to another address)
 
 Notification config (tokens, chat IDs, SMTP settings) lives in
-`config/accounts.yml` under a `notifications` key:
+`accounts.yml` under a `notifications` key:
 
 ```yaml
 notifications:
@@ -252,7 +270,8 @@ same filesystem) and is the only state transition. If processing fails:
 
 Processed emails are kept in `cur/` indefinitely.
 
-A simple lockfile (`flock` on `data/.lock`) prevents concurrent runs.
+A simple lockfile (`flock` on `$MAIL_WORKFLOWS_HOME/.lock`) prevents
+concurrent runs.
 
 ## Implementation Language
 
@@ -271,19 +290,26 @@ A simple lockfile (`flock` on `data/.lock`) prevents concurrent runs.
 git clone <repo> ~/mail-workflows
 cd ~/mail-workflows
 
-# 2. Install dependencies
+# 2. Install dependencies + initialize data directory
 ./setup                    # installs mbsync, pdftotext, ruby gems via brew/apt
+                           # creates ~/.mail-workflows/ with default rules & prompts
+                           # copies accounts.yml.example → ~/.mail-workflows/accounts.yml
 
 # 3. Configure
-cp config/accounts.yml.example config/accounts.yml
-$EDITOR config/accounts.yml   # add IMAP credentials, notification tokens
+$EDITOR ~/.mail-workflows/accounts.yml   # add IMAP credentials, notification tokens
 
-# 4. Schedule
+# 4. Add bin/ to PATH (setup script offers to do this)
+export PATH="$HOME/mail-workflows/bin:$PATH"
+
+# 5. Schedule
 # setup script offers to install the cron entry:
-#   */5 * * * * /path/to/mail-workflows/bin/run >> /path/to/data/logs/cron.log 2>&1
+#   */5 * * * * mail-workflows-run >> ~/.mail-workflows/logs/cron.log 2>&1
 ```
 
 To replicate on another machine: clone repo, run setup, edit accounts.yml.
+To update: `git pull` in the repo directory. User config is untouched.
+To backup: copy `~/.mail-workflows/` (or just `accounts.yml` + `rules/` +
+`prompts/` if you don't need mail archives).
 
 ## Robustness
 
@@ -293,5 +319,5 @@ To replicate on another machine: clone repo, run setup, edit accounts.yml.
 | Downtime / missed crons | mbsync fetches all accumulated mail; processor handles batch |
 | Processing failure | Email stays in `new/`, retried next run; moved to `failed/` after N retries |
 | Partial output | Artifacts written to temp file, renamed atomically on success |
-| Credential security | `accounts.yml` is gitignored; passwords via external commands |
+| Credential security | `accounts.yml` lives outside repo; passwords via external commands |
 | Large attachments | Preprocessors extract text; raw attachments not sent to LLM |
