@@ -7,7 +7,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 export MAIL_WORKFLOWS_HOME="${MAIL_WORKFLOWS_HOME:-$HOME/.mail-workflows}"
 
 # Generate .mbsyncrc from accounts.yml and ensure Maildir directories exist
-ruby "$PROJECT_DIR/lib/generate_mbsyncrc.rb"
+"$SCRIPT_DIR/generate-mbsyncrc"
 
 # Sync all configured accounts
 echo "Syncing mail..."

@@ -5,7 +5,7 @@ require_relative "test_helper"
 class GenerateMbsyncrcTest < Minitest::Test
   def setup
     @tmpdir = Dir.mktmpdir("mbsyncrc-test")
-    @script = File.expand_path("../lib/generate_mbsyncrc.rb", __dir__)
+    @script = File.expand_path("../bin/generate-mbsyncrc", __dir__)
   end
 
   def teardown
