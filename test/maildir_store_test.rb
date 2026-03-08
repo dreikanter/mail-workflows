@@ -80,11 +80,13 @@ class MaildirStoreTest < Minitest::Test
     File.write(File.join(inbox.path, "new", "msg1"), "content")
 
     results = []
-    @store.each_new_message { |msg, md| results << [File.basename(msg), md] }
+    @store.each_new_message { |msg, md, acct, folder| results << [File.basename(msg), md, acct, folder] }
 
     assert_equal 1, results.size
     assert_equal "msg1", results.first[0]
     assert_equal inbox.to_s, results.first[1].to_s
+    assert_equal "personal", results.first[2]
+    assert_equal "INBOX", results.first[3]
   end
 
   def test_each_new_message_returns_enumerator_without_block
