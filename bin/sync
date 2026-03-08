@@ -1,31 +1,37 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env ruby
+# frozen_string_literal: true
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+require_relative "../lib/maildir_store"
+require_relative "../lib/normalizer"
 
-usage() {
-  echo "Usage: sync [--home DIR]" >&2
-  echo "  --home DIR  Data directory (default: \$MAIL_WORKFLOWS_HOME or ~/.mail-workflows)" >&2
-  exit 1
-}
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --home) MAIL_WORKFLOWS_HOME="$2"; shift 2 ;;
-    *) usage ;;
-  esac
-done
-
-export MAIL_WORKFLOWS_HOME="${MAIL_WORKFLOWS_HOME:-$HOME/.mail-workflows}"
+home = ARGV.include?("--home") ? ARGV[ARGV.index("--home") + 1] : nil
+store = MailWorkflows::MaildirStore.new(home)
 
 # Generate .mbsyncrc from accounts.yml and ensure Maildir directories exist
-"$SCRIPT_DIR/generate-mbsyncrc" "$MAIL_WORKFLOWS_HOME"
+script_dir = File.expand_path(__dir__)
+system("ruby", File.join(script_dir, "generate-mbsyncrc"), store.home, exception: true)
 
 # Sync all configured accounts
-echo "Syncing mail..."
-mbsync -c "$MAIL_WORKFLOWS_HOME/.mbsyncrc" -a
-echo "Sync complete."
+$stderr.puts "Syncing mail..."
+rc_path = File.join(store.home, ".mbsyncrc")
+system("mbsync", "-c", rc_path, "-a", exception: true)
+$stderr.puts "Sync complete."
 
 # Normalize new messages
-"$SCRIPT_DIR/normalize" --home "$MAIL_WORKFLOWS_HOME"
+normalizer = MailWorkflows::Normalizer.new(store.home)
+count = 0
+errors = 0
+
+store.each_new_message do |filepath, maildir, account, folder|
+  md_path = normalizer.normalize(filepath, account: account, folder: folder)
+  if md_path
+    maildir.mark_processed(filepath)
+    count += 1
+    $stderr.puts "normalized: #{File.basename(md_path)}"
+  end
+rescue StandardError => e
+  errors += 1
+  $stderr.puts "WARN: failed to normalize #{File.basename(filepath)}: #{e.message}"
+end
+
+$stderr.puts "Done: #{count} normalized, #{errors} errors"
