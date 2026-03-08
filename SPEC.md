@@ -27,12 +27,16 @@ cron (every N minutes)
   +-- run
       +-- 1. acquire lock (flock, skip if already running)
       +-- 2. sync: mbsync pulls new mail → Maildir new/
-      +-- 3. process: for each .eml in new/
+      +-- 3. normalize: for each .eml in new/
+      |       +-- parse MIME (mail gem)
+      |       +-- write markdown + YAML frontmatter → normalized/
+      |       +-- extract attachments → attachments/
+      |       +-- move .eml to cur/ (marks as synced)
+      +-- 4. process: for each normalized .md
               +-- match against rules (from, subject regex)
               +-- preprocess (extract PDF text, strip HTML, etc.)
               +-- handle: run script or LLM with matched prompt
               +-- deliver artifacts / send notifications
-              +-- move .eml to cur/ (marks as processed)
 ```
 
 After downtime, cron fires, mbsync fetches all accumulated mail, and the
@@ -81,11 +85,19 @@ mail-workflows/
 +-- prompts/               # Prompt templates referenced by rules
 |   +-- bank-statement.md
 |   +-- bank-notification.md
-+-- mail/                  # Maildir storage
++-- mail/                  # Maildir storage (raw MIME, managed by mbsync)
 |   +-- <account>/
-|       +-- new/           # Unprocessed emails
-|       +-- cur/           # Processed emails
-|       +-- tmp/           # Maildir temp (used by mbsync)
+|       +-- <folder>/
+|           +-- new/       # Unprocessed emails
+|           +-- cur/       # Processed emails
+|           +-- tmp/       # Maildir temp (used by mbsync)
++-- normalized/            # Plain-text markdown copies (LLM-ready)
+|   +-- <account>/
+|       +-- <timestamp>_<subject-slug>.md
++-- attachments/           # Extracted binary attachments
+|   +-- <timestamp>_<subject-slug>/
+|       +-- invoice.pdf
+|       +-- photo.jpg
 +-- artifacts/             # Generated outputs
 +-- logs/                  # Run logs
 ```
@@ -259,14 +271,107 @@ notifications:
     from: user@gmail.com
 ```
 
+### Email Normalization
+
+Each synced email gets a plain-text markdown copy, separate from the raw
+Maildir. The normalized copy is the input for rule matching, preprocessing,
+and LLM handlers. The raw Maildir remains untouched and syncable.
+
+**When:** Normalization runs after sync, before processing. Moving
+`new/` → `cur/` in Maildir happens after successful normalization.
+
+**Output structure:**
+
+Normalized messages and attachments live in separate top-level directories
+under `$MAIL_WORKFLOWS_HOME`:
+
+```
+normalized/<account>/
+  20260308-143022_invoice-from-acme.md
+  20260308-143022_weekly-report.md
+
+attachments/
+  20260308-143022_invoice-from-acme/
+    invoice.pdf
+    logo.png
+  20260308-143022_weekly-report/
+    report.xlsx
+```
+
+Messages without attachments get no attachments directory.
+
+**Filename format:** `YYYYMMDD-HHMMSS_<subject-slug>[_<suffix>].md`
+
+- Timestamp is the email `Date` header, converted to local time.
+- Subject slug: transliterate non-Latin characters to ASCII, downcase,
+  strip punctuation, replace spaces/runs with hyphens, truncate at ~60
+  characters on a word boundary. Empty subjects become `no-subject`.
+- Uniqueness suffix: only appended when a collision occurs (another
+  message with identical timestamp and slug). Use first 8 hex characters
+  of SHA-256 of the message ID. No suffix when the name is already unique.
+
+**Attachment filenames:** original filename preserved. On collision within
+the same message (duplicate attachment names), append a counter:
+`invoice.pdf`, `invoice-2.pdf`, `invoice-3.pdf`.
+
+**Markdown format:**
+
+```markdown
+---
+message_id: <abc123@mail.example.com>
+from: Alice <alice@example.com>
+to: Bob <bob@example.com>
+subject: Invoice from Acme
+date: 2026-03-08T14:30:22+00:00
+folder: INBOX
+attachments:
+  - invoice.pdf
+  - logo.png
+---
+
+Hey Bob,
+
+Please find the invoice attached.
+```
+
+Frontmatter is minimal YAML: `message_id`, `from`, `to`, `subject`, `date`
+(ISO 8601), `folder` (source IMAP folder), and `attachments` (list of
+filenames, omitted when none). No encoded headers, no MIME artifacts.
+
+**Body extraction rules:**
+
+1. Prefer `text/plain` part if available.
+2. Fall back to `text/html` → convert to Markdown (using `reverse_markdown`
+   gem or equivalent).
+3. Strip email signatures and quoted replies where feasible.
+4. Output is always valid UTF-8 with no quoted-printable or base64 remnants.
+
+**Attachment extraction rules:**
+
+1. Save each MIME attachment to `attachments/<message-dir>/<filename>`.
+2. Inline images (Content-Disposition: inline) are also extracted.
+3. Attachments are binary files, written verbatim from `attachment.decoded`.
+4. The `attachments` list in frontmatter references filenames only (no paths);
+   the attachments directory name matches the markdown filename stem.
+
+**Idempotency:** if a normalized `.md` file already exists for a given
+message ID (checked via frontmatter), skip re-normalization.
+
+**Implementation:** Ruby using the `mail` gem for MIME parsing. The
+normalizer is a thin wrapper (~100-150 lines) that reads a raw `.eml` file
+and writes the markdown + attachment files.
+
 ## State Management
 
-**No database.** Maildir's `new/` → `cur/` move is atomic (rename on the
-same filesystem) and is the only state transition. If processing fails:
-- The .eml stays in `new/`
-- Next run retries it
-- After N consecutive failures on the same message, move it to a `failed/`
-  directory and log a warning
+**No database.** State transitions use Maildir's own directory conventions:
+
+1. mbsync delivers mail to `new/`
+2. Normalization creates markdown + attachments, then moves `.eml` to `cur/`
+3. Processing (rule matching, handlers) operates on normalized files
+
+If normalization fails, the `.eml` stays in `new/` and is retried next run.
+After N consecutive failures on the same message, move it to `failed/`
+and log a warning.
 
 Processed emails are kept in `cur/` indefinitely.
 
