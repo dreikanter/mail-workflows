@@ -26,3 +26,6 @@ export MAIL_WORKFLOWS_HOME="${MAIL_WORKFLOWS_HOME:-$HOME/.mail-workflows}"
 echo "Syncing mail..."
 mbsync -c "$MAIL_WORKFLOWS_HOME/.mbsyncrc" -a
 echo "Sync complete."
+
+# Normalize new messages
+"$SCRIPT_DIR/normalize" --home "$MAIL_WORKFLOWS_HOME"

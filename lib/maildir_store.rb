@@ -14,14 +14,24 @@ module MailWorkflows
       @home = home || ENV.fetch("MAIL_WORKFLOWS_HOME", File.expand_path("~/.mail-workflows"))
     end
 
-    # Returns array of Maildir instances for all configured account/folder pairs.
-    def maildirs
+    # Returns array of {account:, folder:, maildir:} hashes
+    # for all configured account/folder pairs.
+    def maildir_entries
       accounts.flat_map do |name, account|
         folders = account.fetch("folders", ["INBOX"])
         folders.map do |folder|
-          Maildir.new(File.join(mail_path, name, folder))
+          {
+            account: name,
+            folder: folder,
+            maildir: Maildir.new(File.join(mail_path, name, folder))
+          }
         end
       end
+    end
+
+    # Returns array of Maildir instances for all configured account/folder pairs.
+    def maildirs
+      maildir_entries.map { |e| e[:maildir] }
     end
 
     # Create all Maildir directory structures.
@@ -30,12 +40,14 @@ module MailWorkflows
     end
 
     # Iterate over new (unprocessed) messages across all maildirs.
-    # Yields [filepath, maildir] pairs.
+    # Yields [filepath, maildir, account, folder] tuples.
     def each_new_message
       return enum_for(:each_new_message) unless block_given?
 
-      maildirs.each do |maildir|
-        maildir.new_messages.each { |msg| yield msg, maildir }
+      maildir_entries.each do |entry|
+        entry[:maildir].new_messages.each do |msg|
+          yield msg, entry[:maildir], entry[:account], entry[:folder]
+        end
       end
     end
 

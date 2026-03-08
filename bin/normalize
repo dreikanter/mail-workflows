@@ -1,0 +1,26 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/maildir_store"
+require_relative "../lib/normalizer"
+
+home = ARGV.include?("--home") ? ARGV[ARGV.index("--home") + 1] : nil
+store = MailWorkflows::MaildirStore.new(home)
+normalizer = MailWorkflows::Normalizer.new(store.home)
+
+count = 0
+errors = 0
+
+store.each_new_message do |filepath, maildir, account, folder|
+  md_path = normalizer.normalize(filepath, account: account, folder: folder)
+  if md_path
+    maildir.mark_processed(filepath)
+    count += 1
+    $stderr.puts "normalized: #{File.basename(md_path)}"
+  end
+rescue StandardError => e
+  errors += 1
+  $stderr.puts "WARN: failed to normalize #{File.basename(filepath)}: #{e.message}"
+end
+
+$stderr.puts "Done: #{count} normalized, #{errors} errors"
