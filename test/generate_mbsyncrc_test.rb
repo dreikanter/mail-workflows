@@ -150,7 +150,7 @@ class GenerateMbsyncrcTest < Minitest::Test
   end
 
   def run_generator
-    output = `MAIL_WORKFLOWS_HOME=#{Shellwords.shellescape(@tmpdir)} ruby #{Shellwords.shellescape(@script)} 2>&1`
+    output = `ruby #{Shellwords.shellescape(@script)} #{Shellwords.shellescape(@tmpdir)} 2>&1`
     assert $?.success?, "generate_mbsyncrc.rb failed: #{output}"
   end
 

@@ -7,7 +7,7 @@
 require "yaml"
 require "fileutils"
 
-home = ENV.fetch("MAIL_WORKFLOWS_HOME", File.expand_path("~/.mail-workflows"))
+home = ARGV.fetch(0) { ENV.fetch("MAIL_WORKFLOWS_HOME", File.expand_path("~/.mail-workflows")) }
 config = YAML.load_file(File.join(home, "accounts.yml"))
 accounts = config.fetch("accounts", {})
 
