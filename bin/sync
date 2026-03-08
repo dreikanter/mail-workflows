@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+usage() {
+  echo "Usage: sync [--home DIR]" >&2
+  echo "  --home DIR  Data directory (default: \$MAIL_WORKFLOWS_HOME or ~/.mail-workflows)" >&2
+  exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --home) MAIL_WORKFLOWS_HOME="$2"; shift 2 ;;
+    *) usage ;;
+  esac
+done
+
+export MAIL_WORKFLOWS_HOME="${MAIL_WORKFLOWS_HOME:-$HOME/.mail-workflows}"
+
+# Generate .mbsyncrc from accounts.yml and ensure Maildir directories exist
+"$SCRIPT_DIR/generate-mbsyncrc" "$MAIL_WORKFLOWS_HOME"
+
+# Sync all configured accounts
+echo "Syncing mail..."
+mbsync -c "$MAIL_WORKFLOWS_HOME/.mbsyncrc" -a
+echo "Sync complete."
