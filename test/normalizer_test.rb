@@ -203,8 +203,8 @@ class NormalizerTest < Minitest::Test
     end
     mail.text_part = Mail::Part.new(body: "See attached.")
     att = Mail::Part.new
-    att.content_type = 'application/pdf; name="FD-POS%2b260228%2b2%2b1%2b159237%2bmusaev.dtd.pdf"'
-    att.content_disposition = 'attachment; filename="FD-POS%2b260228%2b2%2b1%2b159237%2bmusaev.dtd.pdf"'
+    att.content_type = 'application/pdf; name="FD-POS%2b260228%2b2%2b1%2b159237%2baccount.pdf"'
+    att.content_disposition = 'attachment; filename="FD-POS%2b260228%2b2%2b1%2b159237%2baccount.pdf"'
     att.body = "fake pdf"
     mail.add_part(att)
     path = write_eml(mail.to_s)
@@ -218,7 +218,7 @@ class NormalizerTest < Minitest::Test
     frontmatter = YAML.safe_load(content.split("---\n")[1])
     listed_names = frontmatter["attachments"]
 
-    assert_equal ["FD-POS+260228+2+1+159237+musaev.dtd.pdf"], listed_names
+    assert_equal ["FD-POS-260228-2-1-159237-account.pdf"], listed_names
     # Every name in frontmatter must exist on disk
     listed_names.each do |name|
       assert File.exist?(File.join(att_dir, name)),
@@ -326,6 +326,194 @@ class NormalizerTest < Minitest::Test
     refute_includes content, "CEO, Example Corp"
   end
 
+  def test_forwarded_message_extracts_original_info
+    eml = build_forwarded_eml(
+      forwarder_from: "Jane Doe <jane@example.com>",
+      forwarder_to: "inbox@example.net",
+      original_from: "Acme Corp <no-reply@acme.example.com>",
+      original_to: "<jane@example.com>, <other@example.com>",
+      original_date: "Tue, Mar 3, 2026 at 12:31 PM",
+      original_subject: "Monthly Invoice",
+      body: "Your invoice is attached."
+    )
+    path = write_eml(eml)
+
+    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+
+    content = File.read(md_path)
+    frontmatter = YAML.safe_load(content.split("---\n")[1])
+
+    assert_equal "Acme Corp <no-reply@acme.example.com>", frontmatter["from"]
+    assert_equal "<jane@example.com>, <other@example.com>", frontmatter["to"]
+    assert_equal "Monthly Invoice", frontmatter["subject"]
+    assert_match(/\A2026-03-03T12:31:00/, frontmatter["date"])
+    assert_match(/Jane Doe <jane@example.com>/, frontmatter["forwarded_by"])
+    assert frontmatter["forwarded_date"]
+  end
+
+  def test_forwarded_message_strips_header_block
+    eml = build_forwarded_eml(
+      forwarder_from: "jane@example.com",
+      forwarder_to: "inbox@example.net",
+      original_from: "sender@example.com",
+      original_to: "jane@example.com",
+      original_date: "Mon, Mar 2, 2026 at 10:00 AM",
+      original_subject: "Test",
+      body: "Actual content here."
+    )
+    path = write_eml(eml)
+
+    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+
+    content = File.read(md_path)
+    refute_includes content, "Forwarded message"
+    refute_includes content, "From: sender@example.com"
+    assert_includes content, "Actual content here."
+  end
+
+  def test_forwarded_message_slug_uses_original_subject
+    eml = build_forwarded_eml(
+      forwarder_from: "jane@example.com",
+      forwarder_to: "inbox@example.net",
+      original_from: "sender@example.com",
+      original_to: "jane@example.com",
+      original_date: "Mon, Mar 2, 2026 at 10:00 AM",
+      original_subject: "Original Topic",
+      body: "Content."
+    )
+    path = write_eml(eml)
+
+    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+
+    assert_match(/original-topic\.md\z/, md_path)
+  end
+
+  def test_forwarded_message_uses_original_date_in_stem
+    eml = build_forwarded_eml(
+      forwarder_from: "jane@example.com",
+      forwarder_to: "inbox@example.net",
+      original_from: "sender@example.com",
+      original_to: "jane@example.com",
+      original_date: "Mon, Mar 2, 2026 at 10:00 AM",
+      original_subject: "Dated Email",
+      body: "Content."
+    )
+    path = write_eml(eml)
+
+    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+
+    assert_match(/\A20260302-/, File.basename(md_path))
+  end
+
+  def test_forwarded_date_with_narrow_non_breaking_space
+    eml = build_forwarded_eml(
+      forwarder_from: "jane@example.com",
+      forwarder_to: "inbox@example.net",
+      original_from: "sender@example.com",
+      original_to: "jane@example.com",
+      original_date: "Tue, Mar 3, 2026 at 12:31\u202FPM",
+      original_subject: "NNBSP Date",
+      body: "Content."
+    )
+    path = write_eml(eml)
+
+    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+
+    content = File.read(md_path)
+    frontmatter = YAML.safe_load(content.split("---\n")[1])
+    assert_match(/\A2026-03-03T12:31:00/, frontmatter["date"])
+  end
+
+  def test_forwarded_message_with_attachments
+    eml = build_forwarded_eml(
+      forwarder_from: "jane@example.com",
+      forwarder_to: "inbox@example.net",
+      original_from: "billing@example.com",
+      original_to: "jane@example.com",
+      original_date: "Wed, Mar 4, 2026 at 9:00 AM",
+      original_subject: "Invoice",
+      body: "See attached.",
+      attachments: [{ name: "invoice.pdf", content: "fake pdf" }]
+    )
+    path = write_eml(eml)
+
+    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+
+    content = File.read(md_path)
+    frontmatter = YAML.safe_load(content.split("---\n")[1])
+    assert_equal ["invoice.pdf"], frontmatter["attachments"]
+    assert_equal "billing@example.com", frontmatter["from"]
+    assert frontmatter["forwarded_by"]
+  end
+
+  def test_non_forwarded_message_has_no_forwarding_fields
+    eml = build_eml(
+      from: "alice@example.com",
+      to: "bob@example.com",
+      subject: "Regular Email",
+      body: "Just a normal message."
+    )
+    path = write_eml(eml)
+
+    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+
+    content = File.read(md_path)
+    frontmatter = YAML.safe_load(content.split("---\n")[1])
+    assert_nil frontmatter["forwarded_by"]
+    assert_nil frontmatter["forwarded_date"]
+  end
+
+  def test_auto_forwarded_message_with_x_forwarded_headers
+    mail = Mail.new do
+      from    "Original Sender <sender@example.com>"
+      to      "recipient@example.com"
+      subject "Auto Forwarded"
+      body    "This was auto-forwarded."
+    end
+    mail["X-Forwarded-For"] = "recipient@example.com"
+    mail["X-Forwarded-To"] = "inbox@example.net"
+    path = write_eml(mail.to_s)
+
+    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+
+    content = File.read(md_path)
+    frontmatter = YAML.safe_load(content.split("---\n")[1])
+
+    assert_match(/Original Sender/, frontmatter["from"])
+    assert_match(/recipient@example\.com/, frontmatter["to"])
+    assert_equal "Auto Forwarded", frontmatter["subject"]
+    assert_equal "recipient@example.com", frontmatter["forwarded_by"]
+    assert_nil frontmatter["forwarded_date"]
+    assert_includes content, "This was auto-forwarded."
+  end
+
+  def test_manual_forward_takes_priority_over_header_forwarding
+    fwd_body = "---------- Forwarded message ---------\n" \
+               "From: original@example.com\n" \
+               "Date: Mon, Mar 2, 2026 at 10:00 AM\n" \
+               "Subject: Original\n" \
+               "To: middle@example.com\n" \
+               "\n" +
+               "The content."
+
+    mail = Mail.new do
+      from    "middle@example.com"
+      to      "inbox@example.net"
+      subject "Fwd: Original"
+      body    fwd_body
+    end
+    mail["X-Forwarded-For"] = "some-other@example.com"
+    path = write_eml(mail.to_s)
+
+    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+
+    content = File.read(md_path)
+    frontmatter = YAML.safe_load(content.split("---\n")[1])
+
+    assert_equal "original@example.com", frontmatter["from"]
+    assert_match(/middle@example\.com/, frontmatter["forwarded_by"])
+  end
+
   def test_large_headers_with_many_recipients
     recipients = (1..20).map { |i| "user#{i}@example.com" }.join(", ")
     eml = build_eml(
@@ -378,6 +566,32 @@ class NormalizerTest < Minitest::Test
     end
     mail.text_part = Mail::Part.new(body: text)
     mail.html_part = Mail::Part.new(content_type: "text/html; charset=UTF-8", body: html)
+    mail.to_s
+  end
+
+  def build_forwarded_eml(
+    forwarder_from:, forwarder_to:,
+    original_from:, original_to:, original_date:, original_subject:,
+    body:, attachments: [], message_id: nil
+  )
+    fwd_body = "---------- Forwarded message ---------\n" \
+               "From: #{original_from}\n" \
+               "Date: #{original_date}\n" \
+               "Subject: #{original_subject}\n" \
+               "To: #{original_to}\n" \
+               "\n" +
+               body
+
+    mail = Mail.new do
+      from    forwarder_from
+      to      forwarder_to
+      subject "Fwd: #{original_subject}"
+      body    fwd_body
+    end
+    mail.message_id = message_id if message_id
+    attachments.each do |a|
+      mail.add_file(filename: a[:name], content: a[:content])
+    end
     mail.to_s
   end
 
