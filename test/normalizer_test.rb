@@ -243,8 +243,15 @@ class NormalizerTest < Minitest::Test
     stem = File.basename(md_path, ".md")
     att_dir = File.join(@tmpdir, "attachments", stem)
 
-    assert File.exist?(File.join(att_dir, "file.pdf"))
-    assert File.exist?(File.join(att_dir, "file-2.pdf"))
+    content = File.read(md_path)
+    frontmatter = YAML.safe_load(content.split("---\n")[1])
+    listed_names = frontmatter["attachments"]
+
+    assert_equal %w[file.pdf file-2.pdf], listed_names
+    listed_names.each do |name|
+      assert File.exist?(File.join(att_dir, name)),
+             "frontmatter attachment '#{name}' should exist on disk"
+    end
   end
 
   def test_skips_already_normalized_message
