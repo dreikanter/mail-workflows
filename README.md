@@ -2,6 +2,23 @@
 
 Automatically process incoming emails — extract data, match against processing routes, handle with LLM, and send notifications.
 
+## Prerequisites
+
+- **Ruby** (3.0+)
+- **mbsync** (part of [isync](https://isync.sourceforge.io/)) — syncs IMAP mail to local Maildir
+
+Install on macOS:
+
+```bash
+brew install isync
+```
+
+Install on Linux (Debian/Ubuntu):
+
+```bash
+sudo apt install isync
+```
+
 ## Quick Start
 
 ```bash
@@ -10,6 +27,14 @@ cd ~/mail-workflows
 bin/init
 $EDITOR ~/.mail-workflows/accounts.yml
 ```
+
+## Syncing Mail
+
+```bash
+bin/sync
+```
+
+This generates `~/.mail-workflows/.mbsyncrc` from your `accounts.yml` and runs `mbsync` to pull new messages into `~/.mail-workflows/mail/<account>/<folder>/new/`.
 
 ## Passwords
 
