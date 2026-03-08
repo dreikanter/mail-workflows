@@ -89,7 +89,7 @@ bundle install
 Run tests:
 
 ```bash
-bundle exec ruby -Itest -e 'Dir["test/*_test.rb"].each { |f| require_relative f }'
+bundle exec rake
 ```
 
 See [SPEC.md](SPEC.md) for details.

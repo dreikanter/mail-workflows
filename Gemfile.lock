@@ -38,6 +38,7 @@ GEM
     nokogiri (1.19.1-x86_64-linux-musl)
       racc (~> 1.4)
     racc (1.8.1)
+    rake (13.3.1)
     reverse_markdown (2.1.1)
       nokogiri
     timeout (0.6.0)
@@ -56,6 +57,7 @@ DEPENDENCIES
   babosa (~> 2.0)
   mail (~> 2.8)
   minitest (~> 5.20)
+  rake
   reverse_markdown (~> 2.1)
 
 BUNDLED WITH
