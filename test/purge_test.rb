@@ -13,9 +13,9 @@ class PurgeTest < Minitest::Test
   end
 
   def test_removes_mail_normalized_and_attachments
-    create_tree("mail/personal/INBOX/new/msg.eml")
-    create_tree("normalized/personal/new/20260308-120000_hello.md")
-    create_tree("attachments/20260308-120000_hello/invoice.pdf")
+    write_file("mail/personal/INBOX/new/msg.eml")
+    write_file("normalized/personal/new/20260308-120000_hello.md")
+    write_file("attachments/20260308-120000_hello/invoice.pdf")
 
     run_purge
 
@@ -25,7 +25,7 @@ class PurgeTest < Minitest::Test
   end
 
   def test_preserves_config_files
-    create_tree("mail/personal/INBOX/new/msg.eml")
+    write_file("mail/personal/INBOX/new/msg.eml")
     write_file("accounts.yml", "accounts: {}")
     write_file("rules/bank.yml", "match: {}")
     write_file("prompts/bank.md", "prompt")
@@ -38,12 +38,15 @@ class PurgeTest < Minitest::Test
   end
 
   def test_succeeds_when_dirs_missing
-    # Empty home dir — nothing to remove
+    # Empty home dir — nothing to remove, should still exit 0
     run_purge
+    refute Dir.exist?(File.join(@tmpdir, "mail"))
+    refute Dir.exist?(File.join(@tmpdir, "normalized"))
+    refute Dir.exist?(File.join(@tmpdir, "attachments"))
   end
 
   def test_partial_dirs
-    create_tree("normalized/work/new/msg.md")
+    write_file("normalized/work/new/msg.md")
     # mail/ and attachments/ don't exist
 
     run_purge
@@ -55,13 +58,7 @@ class PurgeTest < Minitest::Test
 
   private
 
-  def create_tree(rel_path)
-    path = File.join(@tmpdir, rel_path)
-    FileUtils.mkdir_p(File.dirname(path))
-    File.write(path, "test data")
-  end
-
-  def write_file(rel_path, content)
+  def write_file(rel_path, content = "test data")
     path = File.join(@tmpdir, rel_path)
     FileUtils.mkdir_p(File.dirname(path))
     File.write(path, content)
