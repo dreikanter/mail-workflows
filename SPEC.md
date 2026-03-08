@@ -49,6 +49,7 @@ mail-workflows/
 |   +-- run                # Entry point (lock → sync → process)
 |   +-- sync               # Wraps mbsync
 |   +-- process            # Core processor loop
+|   +-- init               # One-time data dir initialization
 +-- preprocessors/         # Small scripts, each does one thing
 |   +-- extract-pdf-text   # PDF attachment → plain text
 |   +-- strip-html         # HTML body → plain text
@@ -58,7 +59,7 @@ mail-workflows/
 |   +-- notify-desktop     # macOS desktop notification
 |   +-- notify-telegram    # Send Telegram message
 |   +-- notify-email       # Send email notification
-+-- defaults/              # Shipped defaults, copied on first setup
++-- defaults/              # Shipped defaults, copied on first init
 |   +-- accounts.yml.example
 |   +-- rules/
 |   |   +-- bank-statements.yml
@@ -67,7 +68,6 @@ mail-workflows/
 |       +-- bank-statement.md
 |       +-- bank-notification.md
 +-- .mbsyncrc.template     # Template, rendered from accounts.yml
-+-- setup                  # One-time setup script
 ```
 
 **User data (`$MAIL_WORKFLOWS_HOME`, default `~/.mail-workflows/`):**
@@ -90,7 +90,7 @@ mail-workflows/
 +-- logs/                  # Run logs
 ```
 
-The `setup` script creates `$MAIL_WORKFLOWS_HOME` and copies default
+The `init` command creates `$MAIL_WORKFLOWS_HOME` and copies default
 rules and prompts from `defaults/` if no user config exists yet.
 
 ## Component Details
@@ -105,7 +105,7 @@ rules and prompts from `defaults/` if no user config exists yet.
 - Supports multiple accounts
 
 **Config:** `.mbsyncrc` is generated from `$MAIL_WORKFLOWS_HOME/accounts.yml`
-by the setup script. Credentials never touch the repo.
+by `init`. Credentials never touch the repo.
 
 ### Account Configuration
 
@@ -291,22 +291,22 @@ git clone <repo> ~/mail-workflows
 cd ~/mail-workflows
 
 # 2. Install dependencies + initialize data directory
-./setup                    # installs mbsync, pdftotext, ruby gems via brew/apt
+bin/init                   # installs mbsync, pdftotext, ruby gems via brew/apt
                            # creates ~/.mail-workflows/ with default rules & prompts
                            # copies accounts.yml.example → ~/.mail-workflows/accounts.yml
 
 # 3. Configure
 $EDITOR ~/.mail-workflows/accounts.yml   # add IMAP credentials, notification tokens
 
-# 4. Add bin/ to PATH (setup script offers to do this)
+# 4. Add bin/ to PATH (init offers to do this)
 export PATH="$HOME/mail-workflows/bin:$PATH"
 
 # 5. Schedule
-# setup script offers to install the cron entry:
+# init offers to install the cron entry:
 #   */5 * * * * mail-workflows-run >> ~/.mail-workflows/logs/cron.log 2>&1
 ```
 
-To replicate on another machine: clone repo, run setup, edit accounts.yml.
+To replicate on another machine: clone repo, run `bin/init`, edit accounts.yml.
 To update: `git pull` in the repo directory. User config is untouched.
 To backup: copy `~/.mail-workflows/` (or just `accounts.yml` + `rules/` +
 `prompts/` if you don't need mail archives).
