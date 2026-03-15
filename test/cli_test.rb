@@ -47,7 +47,7 @@ class CLITest < Minitest::Test
     path = File.join(@tmpdir, "new-home")
     run_mw("init #{Shellwords.shellescape(path)}")
 
-    %w[rules prompts mail normalized attachments artifacts log].each do |dir|
+    %w[rules prompts mail normalized attachments state log].each do |dir|
       assert Dir.exist?(File.join(path, dir)), "Expected #{dir}/ to exist"
     end
     assert File.exist?(File.join(path, "accounts.yml"))

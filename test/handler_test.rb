@@ -4,8 +4,8 @@ require_relative "test_helper"
 
 $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
 require "log"
-require "handler"
-require "rule_set"
+require "llm_handler"
+require "script_handler"
 
 class ScriptHandlerTest < Minitest::Test
   def setup

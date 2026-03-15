@@ -80,7 +80,7 @@ module MailWorkflows
         end
       end
 
-      %w[rules prompts mail normalized attachments artifacts state log].each do |dir|
+      %w[rules prompts mail normalized attachments state log].each do |dir|
         FileUtils.mkdir_p(File.join(path, dir))
       end
 
