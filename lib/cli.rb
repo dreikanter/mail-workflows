@@ -207,10 +207,8 @@ module MailWorkflows
 
       store.each_new_message do |filepath, maildir, account, folder|
         result = normalizer.normalize(filepath, account: account, folder: folder)
-        if result
-          maildir.mark_processed(filepath)
-          count += 1
-        end
+        maildir.mark_processed(filepath)
+        count += 1 if result
       rescue StandardError => e
         errors += 1
         log.error "failed to normalize #{File.basename(filepath)}: #{e.message}"
