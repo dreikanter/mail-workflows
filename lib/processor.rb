@@ -40,14 +40,14 @@ module MailWorkflows
       normalized_dir = File.join(@home, "normalized")
       return unless Dir.exist?(normalized_dir)
 
-      Dir.glob(File.join(normalized_dir, "*")).sort.each do |account_dir|
+      Dir.glob(File.join(normalized_dir, "*")).each do |account_dir|
         next unless File.directory?(account_dir)
 
         account = File.basename(account_dir)
         new_dir = File.join(account_dir, "new")
         next unless Dir.exist?(new_dir)
 
-        Dir.glob(File.join(new_dir, "*.md")).sort.each do |md_path|
+        Dir.glob(File.join(new_dir, "*.md")).each do |md_path|
           yield md_path, account
         end
       end
@@ -120,7 +120,7 @@ module MailWorkflows
         },
         "preprocessed" => load_preprocessed(attachment_dir),
         "state_dir" => state_dir,
-        "config" => rule.handler.reject { |k, _| %w[type command prompt].include?(k) }
+        "config" => rule.handler.except("type", "command", "prompt")
       }
     end
 
@@ -189,6 +189,5 @@ module MailWorkflows
       end
       FileUtils.mv(md_path, dest)
     end
-
   end
 end

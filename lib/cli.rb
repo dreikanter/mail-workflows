@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "English"
 require "optparse"
 require "fileutils"
 require "shellwords"
@@ -38,8 +39,14 @@ module MailWorkflows
       OptionParser.new do |o|
         o.banner = "Usage: mw [--path DIR] <command> [options]"
         o.on("--path DIR", "Data directory") { |v| @home = File.expand_path(v) }
-        o.on("--version", "Show version") { cmd_version; exit }
-        o.on("-h", "--help", "Show help") { puts help_text; exit }
+        o.on("--version", "Show version") do
+          cmd_version
+          exit
+        end
+        o.on("-h", "--help", "Show help") do
+          puts help_text
+          exit
+        end
       end.order!(@argv)
     end
 
@@ -81,13 +88,13 @@ module MailWorkflows
       lock_file = File.open(lock_path, File::CREAT | File::WRONLY)
 
       unless lock_file.flock(File::LOCK_EX | File::LOCK_NB)
-        $stderr.puts "Already running, skipping."
+        warn "Already running, skipping."
         exit 75 # EX_TEMPFAIL
       end
 
       log = MailWorkflows.create_logger(home: @home)
       errors = sync_mail(log)
-      exit 1 if errors > 0
+      exit 1 if errors.positive?
     ensure
       lock_file&.close
       log&.close
@@ -98,11 +105,11 @@ module MailWorkflows
       abort "Usage: mw schedule <period> (e.g. 5m, 15m, 1h)" unless period
 
       cron_expr = parse_period(period)
-      mw_bin = File.expand_path("../../bin/mw", __FILE__)
+      mw_bin = File.expand_path("../bin/mw", __dir__)
       log_path = File.join(@home, "log", "cron.log")
 
-      entry = "#{cron_expr} #{Shellwords.shellescape(mw_bin)} --path #{Shellwords.shellescape(@home)} run" \
-              " >> #{Shellwords.shellescape(log_path)} 2>&1 #{CRON_MARKER}"
+      entry = "#{cron_expr} #{Shellwords.shellescape(mw_bin)} --path #{Shellwords.shellescape(@home)} run " \
+              ">> #{Shellwords.shellescape(log_path)} 2>&1 #{CRON_MARKER}"
 
       lines = current_crontab_lines.reject { |l| l.include?(CRON_MARKER) }
       lines << entry
@@ -173,12 +180,12 @@ module MailWorkflows
       PURGE_DIRS.each do |dir|
         path = File.join(@home, dir)
         if Dir.exist?(path)
-          $stderr.puts "removing #{path}"
+          warn "removing #{path}"
           FileUtils.rm_rf(path)
         end
       end
 
-      $stderr.puts "purge complete"
+      warn "purge complete"
     ensure
       lock_file&.close
     end
@@ -256,7 +263,7 @@ module MailWorkflows
 
     def install_crontab(lines)
       IO.popen("crontab -", "w") { |io| io.puts lines.join("\n") }
-      abort "Failed to install crontab" unless $?.success?
+      abort "Failed to install crontab" unless $CHILD_STATUS.success?
     end
 
     def accounts_template

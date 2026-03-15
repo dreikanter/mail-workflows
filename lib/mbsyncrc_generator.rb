@@ -33,14 +33,14 @@ module MailWorkflows
 
       File.open(rc_path, "w", 0o600) do |f|
         accounts.each_with_index do |(name, acct), i|
-          f.puts "" if i > 0
+          f.puts "" if i.positive?
 
           tls_type = acct.fetch("tls", true) ? "IMAPS" : "None"
           folders = acct.fetch("folders", ["INBOX"])
-          store_path = File.join(@home, "mail", name) + "/"
+          store_path = "#{File.join(@home, "mail", name)}/"
 
           @logger.info "account #{name}: #{acct["host"]}:#{acct.fetch("port", 993)} " \
-                        "tls=#{tls_type} folders=#{folders.join(",")}"
+                       "tls=#{tls_type} folders=#{folders.join(",")}"
 
           f.puts "IMAPAccount #{name}"
           f.puts "Host #{acct["host"]}"

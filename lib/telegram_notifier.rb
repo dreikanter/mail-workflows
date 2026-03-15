@@ -25,6 +25,8 @@ module MailWorkflows
       @logger.info "telegram notification sent"
     end
 
+    HTTP_TIMEOUT = 15
+
     private
 
     attr_reader :config
@@ -34,8 +36,6 @@ module MailWorkflows
       yaml = YAML.safe_load_file(path, permitted_classes: [Symbol])
       yaml.dig("notifications", "telegram") || raise("missing notifications.telegram in accounts.yml")
     end
-
-    HTTP_TIMEOUT = 15
 
     def send_message(text)
       token = config.fetch("token")
@@ -56,9 +56,9 @@ module MailWorkflows
 
       response = http.request(request)
 
-      unless response.is_a?(Net::HTTPSuccess)
-        raise "telegram API error: #{response.code} #{response.body}"
-      end
+      return if response.is_a?(Net::HTTPSuccess)
+
+      raise "telegram API error: #{response.code} #{response.body}"
     end
 
     def escape_md(text)

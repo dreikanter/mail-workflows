@@ -11,7 +11,7 @@ class MaildirStoreTest < Minitest::Test
           "host" => "imap.example.com",
           "user" => "user@example.com",
           "pass_cmd" => "echo secret",
-          "folders" => ["INBOX", "Sent"]
+          "folders" => %w[INBOX Sent]
         }
       }
     )
@@ -54,7 +54,7 @@ class MaildirStoreTest < Minitest::Test
     write_accounts_yml(
       "accounts" => {
         "personal" => { "host" => "a.com", "user" => "a@a.com", "pass_cmd" => "echo x", "folders" => ["INBOX"] },
-        "work" => { "host" => "b.com", "user" => "b@b.com", "pass_cmd" => "echo y", "folders" => ["INBOX", "Archive"] }
+        "work" => { "host" => "b.com", "user" => "b@b.com", "pass_cmd" => "echo y", "folders" => %w[INBOX Archive] }
       }
     )
     store = MailWorkflows::MaildirStore.new(@tmpdir)

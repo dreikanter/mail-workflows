@@ -21,7 +21,10 @@ class TelegramNotifierTest < Minitest::Test
     fake_http.expect(:use_ssl=, nil, [true])
     fake_http.expect(:open_timeout=, nil, [15])
     fake_http.expect(:read_timeout=, nil, [15])
-    fake_http.expect(:request, fake_response) { |req| sent_body = req.body; true }
+    fake_http.expect(:request, fake_response) do |req|
+      sent_body = req.body
+      true
+    end
 
     Net::HTTP.stub(:new, fake_http) do
       notifier.notify(
@@ -47,7 +50,10 @@ class TelegramNotifierTest < Minitest::Test
     fake_http.expect(:use_ssl=, nil, [true])
     fake_http.expect(:open_timeout=, nil, [15])
     fake_http.expect(:read_timeout=, nil, [15])
-    fake_http.expect(:request, fake_response) { |req| sent_body = req.body; true }
+    fake_http.expect(:request, fake_response) do |req|
+      sent_body = req.body
+      true
+    end
 
     Net::HTTP.stub(:new, fake_http) do
       notifier.notify(

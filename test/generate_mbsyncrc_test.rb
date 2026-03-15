@@ -84,7 +84,7 @@ class MbsyncrcGeneratorTest < Minitest::Test
           "host" => "imap.work.com",
           "user" => "user@work.com",
           "pass_cmd" => "echo x",
-          "folders" => ["INBOX", "Sent", "Archive"]
+          "folders" => %w[INBOX Sent Archive]
         }
       }
     )
@@ -101,7 +101,7 @@ class MbsyncrcGeneratorTest < Minitest::Test
           "host" => "imap.test.com",
           "user" => "user@test.com",
           "pass_cmd" => "echo x",
-          "folders" => ["INBOX", "Drafts"]
+          "folders" => %w[INBOX Drafts]
         }
       }
     )

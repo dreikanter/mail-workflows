@@ -87,7 +87,7 @@ class NormalizerTest < Minitest::Test
 
     att_dir = File.join(@tmpdir, "attachments", stem)
     assert Dir.exist?(att_dir), "attachments directory should exist"
-    assert File.exist?(File.join(att_dir, "report.pdf"))
+    assert_path_exists File.join(att_dir, "report.pdf")
     assert_equal "fake pdf content", File.read(File.join(att_dir, "report.pdf"))
 
     # Frontmatter should list attachment
@@ -117,7 +117,7 @@ class NormalizerTest < Minitest::Test
 
     att_dir = File.join(@tmpdir, "attachments", stem)
     assert Dir.exist?(att_dir), "attachments dir should exist for inline images"
-    assert File.exist?(File.join(att_dir, "logo.png"))
+    assert_path_exists File.join(att_dir, "logo.png")
   end
 
   def test_filename_slug_from_subject
@@ -220,8 +220,8 @@ class NormalizerTest < Minitest::Test
     assert_equal ["FD-POS-260228-2-1-159237-account.pdf"], listed_names
     # Every name in frontmatter must exist on disk
     listed_names.each do |name|
-      assert File.exist?(File.join(att_dir, name)),
-             "frontmatter attachment '#{name}' should exist on disk"
+      assert_path_exists File.join(att_dir, name),
+                         "frontmatter attachment '#{name}' should exist on disk"
     end
   end
 
@@ -248,8 +248,8 @@ class NormalizerTest < Minitest::Test
 
     assert_equal %w[file.pdf file-2.pdf], listed_names
     listed_names.each do |name|
-      assert File.exist?(File.join(att_dir, name)),
-             "frontmatter attachment '#{name}' should exist on disk"
+      assert_path_exists File.join(att_dir, name),
+                         "frontmatter attachment '#{name}' should exist on disk"
     end
   end
 
@@ -492,7 +492,7 @@ class NormalizerTest < Minitest::Test
                "Date: Mon, Mar 2, 2026 at 10:00 AM\n" \
                "Subject: Original\n" \
                "To: middle@example.com\n" \
-               "\n" +
+               "\n" \
                "The content."
 
     mail = Mail.new do

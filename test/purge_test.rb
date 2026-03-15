@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "English"
 require_relative "test_helper"
 
 class PurgeTest < Minitest::Test
@@ -32,9 +33,9 @@ class PurgeTest < Minitest::Test
 
     run_purge
 
-    assert File.exist?(File.join(@tmpdir, "accounts.yml"))
-    assert File.exist?(File.join(@tmpdir, "rules/bank.yml"))
-    assert File.exist?(File.join(@tmpdir, "prompts/bank.md"))
+    assert_path_exists File.join(@tmpdir, "accounts.yml")
+    assert_path_exists File.join(@tmpdir, "rules/bank.yml")
+    assert_path_exists File.join(@tmpdir, "prompts/bank.md")
   end
 
   def test_succeeds_when_dirs_missing
@@ -64,6 +65,6 @@ class PurgeTest < Minitest::Test
 
   def run_purge
     output = `ruby #{Shellwords.shellescape(@mw)} --path #{Shellwords.shellescape(@tmpdir)} purge --confirm 2>&1`
-    assert $?.success?, "purge failed: #{output}"
+    assert_predicate $CHILD_STATUS, :success?, "purge failed: #{output}"
   end
 end

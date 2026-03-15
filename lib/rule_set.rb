@@ -4,7 +4,7 @@ require "yaml"
 
 module MailWorkflows
   # A single rule loaded from a YAML file in rules/.
-  Rule = Struct.new(:name, :match, :handler, :notify, :source_path, keyword_init: true)
+  Rule = Struct.new(:name, :match, :handler, :notify, :source_path)
 
   # Loads rules from YAML files and matches them against normalized emails.
   # Rules are evaluated in filename order; first match wins.
@@ -41,7 +41,7 @@ module MailWorkflows
       dir = rules_dir
       return [] unless Dir.exist?(dir)
 
-      Dir.glob(File.join(dir, "*.yml")).sort.filter_map do |path|
+      Dir.glob(File.join(dir, "*.yml")).filter_map do |path|
         data = YAML.safe_load_file(path, permitted_classes: [Symbol])
         name = data.fetch("name")
 
@@ -64,7 +64,7 @@ module MailWorkflows
       name.is_a?(String) && name.match?(/\A[a-zA-Z0-9_][a-zA-Z0-9._-]*\z/)
     end
 
-    def matches_rule?(rule, frontmatter, body, full_text)
+    def matches_rule?(rule, frontmatter, _body, full_text)
       criteria = rule.match
       return false if criteria.nil? || criteria.empty?
 
