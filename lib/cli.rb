@@ -95,11 +95,12 @@ module MailWorkflows
 
       unless lock_file.flock(File::LOCK_EX | File::LOCK_NB)
         $stderr.puts "Already running, skipping."
-        exit 0
+        exit 75 # EX_TEMPFAIL
       end
 
       log = MailWorkflows.create_logger(home: @home)
-      sync_mail(log)
+      errors = sync_mail(log)
+      exit 1 if errors > 0
     end
 
     def cmd_schedule
@@ -219,6 +220,8 @@ module MailWorkflows
 
       processor = MailWorkflows::Processor.new(@home, logger: log)
       processor.run
+
+      errors
     end
 
     # --- Helpers ---
