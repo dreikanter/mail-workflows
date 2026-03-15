@@ -248,7 +248,7 @@ for each .md in normalized/<account>/new/:
 Retry tracking: a sidecar file `<message>.retries` next to the `.md`,
 containing the failure count as a plain integer.
 
-## Directory Layout (additions)
+## Directory Layout (additions to user data)
 
 ```
 ~/.mail-workflows/
@@ -258,24 +258,7 @@ containing the failure count as a plain integer.
       last_month.json
     payment-tracker/
       payments.csv
-
-mail-workflows/                  # tool repo
-  lib/
-    rule_matcher.rb              # rule loading, matching logic
-    handler_runner.rb            # handler dispatch (llm/script)
-    notifier.rb                  # notification dispatch
-  handlers/                      # shipped example handler scripts
-    track-payment
-  docs/
-    specs/
-      handlers.md                # this file
 ```
-
-## Dependencies (new)
-
-| Dependency | Purpose | Install |
-|-----------|---------|---------|
-| Claude Code | `type: llm` handlers | `npm install -g @anthropic-ai/claude-code` |
 
 ## Design Decisions
 

@@ -82,6 +82,7 @@ mail-workflows/
 +-- attachments/           # Extracted binary attachments
 |   +-- <timestamp>_<subject-slug>/
 |       +-- invoice.pdf
+|       +-- invoice.pdf.md   # PDF converted to Markdown (auto-generated)
 +-- log/                   # Run logs
     +-- sync.log
     +-- cron.log
