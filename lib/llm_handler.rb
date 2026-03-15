@@ -23,11 +23,11 @@ module MailWorkflows
 
       FileUtils.mkdir_p(state_dir)
 
-      cmd = build_command(model, attachment_dir, prompt_text)
+      cmd = build_command(model, attachment_dir)
       @logger.info "llm handler: model=#{model} prompt=#{prompt_name}"
 
       stdout, stderr, status = Timeout.timeout(TIMEOUT_SECONDS) do
-        Open3.capture3(*cmd, chdir: state_dir)
+        Open3.capture3(*cmd, stdin_data: prompt_text, chdir: state_dir)
       end
 
       unless status.success?
@@ -40,10 +40,10 @@ module MailWorkflows
 
     private
 
-    def build_command(model, attachment_dir, prompt_text)
+    def build_command(model, attachment_dir)
       cmd = ["claude", "-p", "--model", model, "--allowedTools", "Read,Write", "--output-format", "json"]
       cmd += ["--add-dir", attachment_dir] if attachment_dir && Dir.exist?(attachment_dir)
-      cmd << prompt_text
+      cmd
     end
 
     def assemble_prompt(prompt_name, input)
