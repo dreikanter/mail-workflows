@@ -13,7 +13,7 @@ module MailWorkflows
     def run
       config_path = File.join(@home, "accounts.yml")
       @logger.info "loading accounts from #{config_path}"
-      config = YAML.load_file(config_path)
+      config = YAML.safe_load_file(config_path, permitted_classes: [Symbol])
       accounts = config.fetch("accounts", {})
       @logger.info "found #{accounts.size} account(s): #{accounts.keys.join(", ")}"
 

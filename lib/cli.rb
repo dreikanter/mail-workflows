@@ -145,7 +145,7 @@ module MailWorkflows
 
       accounts_path = File.join(@home, "accounts.yml")
       if File.exist?(accounts_path)
-        config = YAML.load_file(accounts_path, permitted_classes: [Symbol]) || {}
+        config = YAML.safe_load_file(accounts_path, permitted_classes: [Symbol]) || {}
         accounts = config.fetch("accounts", {})
         if accounts.any?
           puts "Accounts:"
