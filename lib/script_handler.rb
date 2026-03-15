@@ -2,11 +2,13 @@
 
 require "json"
 require "open3"
+require "timeout"
 require_relative "log"
 
 module MailWorkflows
   # Runs an arbitrary executable with JSON input on stdin.
   class ScriptHandler
+    TIMEOUT_SECONDS = 120
     def initialize(home, logger: NULL_LOGGER)
       @home = home
       @logger = logger
@@ -19,7 +21,9 @@ module MailWorkflows
 
       @logger.info "script handler: #{command}"
 
-      stdout, stderr, status = Open3.capture3(command, stdin_data: JSON.generate(input))
+      stdout, stderr, status = Timeout.timeout(TIMEOUT_SECONDS) do
+        Open3.capture3(command, stdin_data: JSON.generate(input))
+      end
 
       unless status.success?
         @logger.error "script exited #{status.exitstatus}: #{stderr}"

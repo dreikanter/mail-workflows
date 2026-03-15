@@ -37,16 +37,26 @@ module MailWorkflows
       yaml.dig("notifications", "telegram") || raise("missing notifications.telegram in accounts.yml")
     end
 
+    HTTP_TIMEOUT = 15
+
     def send_message(text)
       token = config.fetch("token")
       chat_id = config.fetch("chat_id")
       uri = URI("https://api.telegram.org/bot#{token}/sendMessage")
 
-      response = Net::HTTP.post_form(uri, {
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+      http.open_timeout = HTTP_TIMEOUT
+      http.read_timeout = HTTP_TIMEOUT
+
+      request = Net::HTTP::Post.new(uri)
+      request.set_form_data(
         "chat_id" => chat_id,
         "text" => text,
         "parse_mode" => "MarkdownV2"
-      })
+      )
+
+      response = http.request(request)
 
       unless response.is_a?(Net::HTTPSuccess)
         raise "telegram API error: #{response.code} #{response.body}"

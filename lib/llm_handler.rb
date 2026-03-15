@@ -2,6 +2,7 @@
 
 require "json"
 require "open3"
+require "timeout"
 require "yaml"
 require "fileutils"
 require_relative "log"
@@ -9,6 +10,7 @@ require_relative "log"
 module MailWorkflows
   # Runs claude -p with an assembled prompt template.
   class LlmHandler
+    TIMEOUT_SECONDS = 300
     def initialize(home, logger: NULL_LOGGER)
       @home = home
       @logger = logger
@@ -26,7 +28,9 @@ module MailWorkflows
       cmd = build_command(model, attachment_dir, prompt_text)
       @logger.info "llm handler: model=#{model} prompt=#{prompt_name}"
 
-      stdout, stderr, status = Open3.capture3(*cmd, chdir: state_dir)
+      stdout, stderr, status = Timeout.timeout(TIMEOUT_SECONDS) do
+        Open3.capture3(*cmd, chdir: state_dir)
+      end
 
       unless status.success?
         @logger.error "claude exited #{status.exitstatus}: #{stderr}"
