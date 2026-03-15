@@ -2,6 +2,7 @@
 
 require "yaml"
 require "json"
+require "digest"
 require "fileutils"
 require "time"
 require_relative "log"
@@ -159,9 +160,14 @@ module MailWorkflows
 
       timestamp = Time.now.strftime("%Y%m%d-%H%M%S")
       slug = Slug.slugify(frontmatter["subject"])
-      filename = "#{timestamp}_#{slug}.json"
+      base = "#{timestamp}_#{slug}"
 
-      path = File.join(state_dir, filename)
+      path = File.join(state_dir, "#{base}.json")
+      if File.exist?(path)
+        suffix = Digest::SHA256.hexdigest(frontmatter["message_id"].to_s)[0, 8]
+        path = File.join(state_dir, "#{base}_#{suffix}.json")
+      end
+
       File.write(path, JSON.pretty_generate(output))
       @logger.info "saved output: #{path}"
     end
