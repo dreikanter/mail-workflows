@@ -175,7 +175,7 @@ module MailWorkflows
       }
 
       rule.notify.each do |notify_config|
-        Notifier.send(notify_config, output, metadata, home: @home, logger: @logger)
+        Notifier.notify(notify_config, output, metadata, home: @home, logger: @logger)
       rescue StandardError => e
         @logger.error "notification failed (#{notify_config["type"]}): #{e.message}"
       end

@@ -11,7 +11,7 @@ module MailWorkflows
     # Sends a notification for a handler result.
     # notify_config is a single entry from the rule's notify array.
     # metadata contains email info (from, subject, date, rule_name).
-    def send(notify_config, handler_output, metadata, home:, logger: NULL_LOGGER)
+    def notify(notify_config, handler_output, metadata, home:, logger: NULL_LOGGER)
       type = notify_config.fetch("type")
 
       case type
