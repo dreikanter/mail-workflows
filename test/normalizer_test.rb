@@ -513,6 +513,32 @@ class NormalizerTest < Minitest::Test
     assert_match(/middle@example\.com/, frontmatter["forwarded_by"])
   end
 
+  def test_falls_back_to_raw_body_on_encoding_error
+    eml = build_eml(
+      from: "a@example.com",
+      to: "b@example.com",
+      subject: "Encoding Test",
+      body: "fallback body text"
+    )
+    path = write_eml(eml)
+
+    # Stub Mail.read to return a message whose decoded raises
+    original_read = Mail.method(:read)
+    Mail.define_singleton_method(:read) do |p|
+      msg = original_read.call(p)
+      msg.define_singleton_method(:decoded) { raise Mail::UnknownEncodingType, "bad encoding" }
+      msg
+    end
+
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+
+    assert result
+    content = File.read(result.path)
+    assert_includes content, "fallback body text"
+  ensure
+    Mail.define_singleton_method(:read, original_read)
+  end
+
   def test_large_headers_with_many_recipients
     recipients = (1..20).map { |i| "user#{i}@example.com" }.join(", ")
     eml = build_eml(

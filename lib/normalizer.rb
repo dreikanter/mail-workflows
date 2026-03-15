@@ -185,19 +185,8 @@ module MailWorkflows
           return html_to_markdown(html.decoded)
         end
 
-        # Try first text part
-        msg.parts.each do |part|
-          if part.content_type&.start_with?("text/plain")
-            @logger.info "body: using text/plain from parts scan"
-            return part.decoded
-          end
-          if part.content_type&.start_with?("text/html")
-            @logger.info "body: converting text/html from parts scan"
-            return html_to_markdown(part.decoded)
-          end
-        end
-        @logger.info "body: no usable text part found"
-        nil
+        # Scan parts, recursing into nested multipart containers
+        find_text_in_parts(msg.parts)
       elsif msg.content_type&.start_with?("text/html")
         @logger.info "body: converting single-part text/html"
         html_to_markdown(msg.decoded)
@@ -208,6 +197,23 @@ module MailWorkflows
     rescue Mail::UnknownEncodingType, Encoding::UndefinedConversionError => e
       @logger.warn "body: encoding error (#{e.class}), falling back to raw body"
       msg.body.to_s
+    end
+
+    def find_text_in_parts(parts)
+      parts.each do |part|
+        if part.multipart?
+          result = find_text_in_parts(part.parts)
+          return result if result
+        elsif part.content_type&.start_with?("text/plain")
+          @logger.info "body: using text/plain from parts scan"
+          return part.decoded
+        elsif part.content_type&.start_with?("text/html")
+          @logger.info "body: converting text/html from parts scan"
+          return html_to_markdown(part.decoded)
+        end
+      end
+      @logger.info "body: no usable text part found"
+      nil
     end
 
     def html_to_markdown(html)

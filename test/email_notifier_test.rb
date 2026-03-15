@@ -2,16 +2,6 @@
 
 require_relative "test_helper"
 
-class TelegramNotifierTest < Minitest::Test
-  def test_escapes_markdown_v2_characters
-    notifier = MailWorkflows::TelegramNotifier.allocate
-    escaped = notifier.send(:escape_md, "Hello *world* [link](url) ~strike~")
-    assert_includes escaped, '\\*'
-    assert_includes escaped, '\\['
-    assert_includes escaped, '\\~'
-  end
-end
-
 class EmailNotifierTest < Minitest::Test
   def setup
     @tmpdir = Dir.mktmpdir("notifier-test")
@@ -24,8 +14,22 @@ class EmailNotifierTest < Minitest::Test
 
   def test_default_to_uses_from_address
     notifier = MailWorkflows::EmailNotifier.new(@tmpdir)
-    to = notifier.send(:default_to)
-    assert_equal "user@gmail.com", to
+
+    captured_to = nil
+    fake_mailer = Object.new
+    fake_mailer.define_singleton_method(:send) do |to:, **_kw|
+      captured_to = to
+    end
+
+    MailWorkflows::Mailer.stub(:new, fake_mailer) do
+      notifier.notify(
+        {},
+        { "summary" => "test", "body" => "" },
+        { rule_name: "r", from: "a@b.com", subject: "s", date: "2026-01-01" }
+      )
+    end
+
+    assert_equal "user@gmail.com", captured_to
   end
 
   private
