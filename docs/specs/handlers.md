@@ -172,7 +172,7 @@ For automations unrelated to LLM, or for full custom control.
 ```yaml
 handler:
   type: script
-  command: handlers/track-payment      # relative to tool repo, or absolute
+  command: handlers/track-payment      # relative to $MAIL_WORKFLOWS_HOME, or absolute
 ```
 
 The script receives the full handler input JSON on stdin and writes handler
