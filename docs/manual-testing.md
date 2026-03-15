@@ -429,7 +429,7 @@ cat > $TEST_DIR/rules/01-and.yml << 'EOF'
 name: and-test
 match:
   from: megabank
-  subject: statement
+  subject: Statement
 handler:
   type: script
   command: handlers/echo.sh
@@ -497,6 +497,120 @@ cat $TEST_DIR/state/config-test/*.json | ruby -rjson -e '
 ```
 
 Should print `{"custom_threshold"=>1000, "currency"=>"USD"}`.
+
+**Reset:**
+
+```bash
+reset_emails
+```
+
+### Scenario 10: `anywhere` match field
+
+**Setup:**
+
+```bash
+cat > $TEST_DIR/rules/01-anywhere.yml << 'EOF'
+name: anywhere-test
+match:
+  anywhere: lunch
+handler:
+  type: script
+  command: handlers/echo.sh
+notify: []
+EOF
+```
+
+**Run:**
+
+```bash
+run_test
+```
+
+**Expect:**
+- The "Lunch tomorrow?" email does NOT match (`anywhere` is case-sensitive, "lunch" vs "Lunch")
+- All 3 emails move to `processed/` as unmatched
+
+**Reset:**
+
+```bash
+reset_emails
+```
+
+Now test with regex for case-insensitive:
+
+```bash
+cat > $TEST_DIR/rules/01-anywhere.yml << 'EOF'
+name: anywhere-test
+match:
+  anywhere: /lunch/i
+handler:
+  type: script
+  command: handlers/echo.sh
+notify: []
+EOF
+```
+
+**Run:**
+
+```bash
+run_test
+```
+
+**Expect:**
+- The "Lunch tomorrow?" email matches (body contains "lunch" case-insensitive)
+- Other 2 emails do not match
+- State output at `state/anywhere-test/`
+
+**Verify:**
+
+```bash
+ls $TEST_DIR/state/anywhere-test/
+```
+
+**Reset:**
+
+```bash
+reset_emails
+```
+
+### Scenario 11: Handler returns invalid output
+
+**Setup:** Create a script that returns JSON without a `summary` field:
+
+```bash
+cat > $TEST_DIR/handlers/bad-output.sh << 'SCRIPT'
+#!/bin/bash
+echo '{"body": "no summary here"}'
+SCRIPT
+chmod +x $TEST_DIR/handlers/bad-output.sh
+
+cat > $TEST_DIR/rules/01-bad-output.yml << 'EOF'
+name: bad-output-test
+match:
+  from: megabank
+handler:
+  type: script
+  command: handlers/bad-output.sh
+notify: []
+EOF
+```
+
+**Run:**
+
+```bash
+run_test
+```
+
+**Expect:**
+- Log: `handler failed` with error about missing `summary`
+- Bank email moves to `failed/`
+- Other emails move to `processed/`
+
+**Verify:**
+
+```bash
+ls $TEST_DIR/normalized/personal/failed/
+```
 
 **Reset:**
 
