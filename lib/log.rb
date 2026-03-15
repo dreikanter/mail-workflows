@@ -7,7 +7,7 @@ module MailWorkflows
   # Levels: DEBUG, INFO, WARN, ERROR
   def self.create_logger(level: Logger::INFO, home: nil)
     formatter = proc do |severity, time, _prog, msg|
-      "#{time.strftime("%Y-%m-%d %H:%M:%S")} #{severity[0]} #{msg}\n"
+      "[#{time.strftime("%Y-%m-%d %H:%M:%S")}] [#{severity[0]}] #{msg}\n"
     end
 
     targets = [$stderr]
