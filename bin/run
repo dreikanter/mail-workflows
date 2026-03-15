@@ -1,0 +1,30 @@
+#!/bin/bash
+# frozen_string_literal: true
+
+# Entry point for scheduled execution. Acquires a lock to prevent concurrent
+# runs, then syncs mail and processes new messages.
+#
+# Usage: bin/run [--home DIR]
+#
+# Schedule with launchd (see README) or run manually.
+
+set -euo pipefail
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Resolve home directory from --home flag or environment
+HOME_DIR="${MAIL_WORKFLOWS_HOME:-$HOME/.mail-workflows}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --home) HOME_DIR="$2"; shift 2 ;;
+    *) echo "Usage: run [--home DIR]" >&2; exit 1 ;;
+  esac
+done
+
+# Acquire lock — skip if another run is already in progress
+LOCK_FILE="$HOME_DIR/.lock"
+exec 200>"$LOCK_FILE"
+flock -n 200 || { echo "Already running, skipping." >&2; exit 0; }
+
+"$BIN_DIR/sync" --home "$HOME_DIR"
+# "$BIN_DIR/process" --home "$HOME_DIR"  # TODO: implement
