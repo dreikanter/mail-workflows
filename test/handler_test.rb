@@ -236,6 +236,48 @@ class LlmHandlerTest < Minitest::Test
     assert_equal "parsed ok", result["summary"]
   end
 
+  def test_execute_success
+    File.write(File.join(@prompts_dir, "test.md"), "Analyze: {{EMAIL_CONTENT}}")
+
+    claude_response = JSON.generate({
+      "type" => "result",
+      "result" => '{"summary": "test result", "body": "", "data": {}}'
+    })
+
+    handler = MailWorkflows::LlmHandler.new(@tmpdir)
+    status = Minitest::Mock.new
+    status.expect(:success?, true)
+
+    Open3.stub(:capture3, [claude_response, "", status]) do
+      result = handler.execute({ "prompt" => "test" }, sample_input)
+      assert_equal "test result", result["summary"]
+    end
+  end
+
+  def test_execute_raises_on_claude_failure
+    File.write(File.join(@prompts_dir, "test.md"), "{{EMAIL_CONTENT}}")
+
+    handler = MailWorkflows::LlmHandler.new(@tmpdir)
+    status = Object.new
+    status.define_singleton_method(:success?) { false }
+    status.define_singleton_method(:exitstatus) { 1 }
+
+    Open3.stub(:capture3, ["", "error msg", status]) do
+      err = assert_raises(RuntimeError) { handler.execute({ "prompt" => "test" }, sample_input) }
+      assert_match(/claude failed/, err.message)
+    end
+  end
+
+  def test_execute_raises_on_timeout
+    File.write(File.join(@prompts_dir, "test.md"), "{{EMAIL_CONTENT}}")
+
+    handler = MailWorkflows::LlmHandler.new(@tmpdir)
+
+    Open3.stub(:capture3, ->(*_args, **_kw) { raise Timeout::Error }) do
+      assert_raises(Timeout::Error) { handler.execute({ "prompt" => "test" }, sample_input) }
+    end
+  end
+
   private
 
   def sample_input
