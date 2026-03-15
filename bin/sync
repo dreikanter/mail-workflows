@@ -33,7 +33,7 @@ while args.any?
 end
 
 level = verbose ? Logger::DEBUG : Logger::INFO
-log = MailWorkflows.create_logger(level: level)
+log = MailWorkflows.create_logger(level: level, home: home)
 
 # --- Step 1: Generate .mbsyncrc and prepare Maildir ---
 
