@@ -5,7 +5,7 @@ require_relative "test_helper"
 class PurgeTest < Minitest::Test
   def setup
     @tmpdir = Dir.mktmpdir("purge-test")
-    @script = File.expand_path("../bin/purge", __dir__)
+    @mw = File.expand_path("../bin/mw", __dir__)
   end
 
   def teardown
@@ -38,7 +38,6 @@ class PurgeTest < Minitest::Test
   end
 
   def test_succeeds_when_dirs_missing
-    # Empty home dir — nothing to remove, should still exit 0
     run_purge
     refute Dir.exist?(File.join(@tmpdir, "mail"))
     refute Dir.exist?(File.join(@tmpdir, "normalized"))
@@ -47,7 +46,6 @@ class PurgeTest < Minitest::Test
 
   def test_partial_dirs
     write_file("normalized/work/new/msg.md")
-    # mail/ and attachments/ don't exist
 
     run_purge
 
@@ -65,7 +63,7 @@ class PurgeTest < Minitest::Test
   end
 
   def run_purge
-    output = `bash #{Shellwords.shellescape(@script)} --home #{Shellwords.shellescape(@tmpdir)} 2>&1`
+    output = `ruby #{Shellwords.shellescape(@mw)} --path #{Shellwords.shellescape(@tmpdir)} purge --confirm 2>&1`
     assert $?.success?, "purge failed: #{output}"
   end
 end
