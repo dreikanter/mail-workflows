@@ -162,6 +162,14 @@ module MailWorkflows
         abort "This will delete all mail, normalized, and attachment data.\nUse --confirm to proceed."
       end
 
+      lock_path = File.join(@home, ".lock")
+      FileUtils.mkdir_p(File.dirname(lock_path))
+      lock_file = File.open(lock_path, File::CREAT | File::WRONLY)
+
+      unless lock_file.flock(File::LOCK_EX | File::LOCK_NB)
+        abort "A sync is running. Try again later."
+      end
+
       PURGE_DIRS.each do |dir|
         path = File.join(@home, dir)
         if Dir.exist?(path)
@@ -171,6 +179,8 @@ module MailWorkflows
       end
 
       $stderr.puts "purge complete"
+    ensure
+      lock_file&.close
     end
 
     def cmd_version
