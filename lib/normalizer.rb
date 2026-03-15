@@ -23,7 +23,7 @@ module MailWorkflows
     def normalize(eml_path, account:, folder:)
       @logger.info "reading #{File.basename(eml_path)}"
       msg = Mail.read(eml_path)
-      message_id = msg.message_id || Digest::SHA256.hexdigest(File.read(eml_path))
+      message_id = msg.message_id || Digest::SHA256.hexdigest(msg.raw_source)
 
       if already_normalized?(account, message_id)
         @logger.info "skip: already normalized message_id=#{message_id}"
