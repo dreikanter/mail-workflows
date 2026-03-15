@@ -58,23 +58,10 @@ module MailWorkflows
       end
 
       if force && Dir.exist?(path)
-        # Preserve user config, remove everything else
+        # Remove non-preserved contents selectively to avoid data loss window
         preserve = %w[accounts.yml rules prompts]
-        preserved = {}
-        preserve.each do |name|
-          src = File.join(path, name)
-          next unless File.exist?(src) || Dir.exist?(src)
-          tmp = Dir.mktmpdir
-          FileUtils.cp_r(src, File.join(tmp, name))
-          preserved[name] = tmp
-        end
-
-        FileUtils.rm_rf(path)
-
-        FileUtils.mkdir_p(path)
-        preserved.each do |name, tmp|
-          FileUtils.cp_r(File.join(tmp, name), File.join(path, name))
-          FileUtils.rm_rf(tmp)
+        (Dir.entries(path) - %w[. ..] - preserve).each do |entry|
+          FileUtils.rm_rf(File.join(path, entry))
         end
       end
 
