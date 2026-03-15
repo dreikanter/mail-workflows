@@ -41,16 +41,27 @@ module MailWorkflows
       dir = rules_dir
       return [] unless Dir.exist?(dir)
 
-      Dir.glob(File.join(dir, "*.yml")).sort.map do |path|
-        data = YAML.load_file(path, permitted_classes: [Symbol])
+      Dir.glob(File.join(dir, "*.yml")).sort.filter_map do |path|
+        data = YAML.safe_load_file(path, permitted_classes: [Symbol])
+        name = data.fetch("name")
+
+        unless valid_rule_name?(name)
+          @logger.error "invalid rule name #{name.inspect} in #{path}, skipping"
+          next
+        end
+
         Rule.new(
-          name: data.fetch("name"),
+          name: name,
           match: data.fetch("match", {}),
           handler: data.fetch("handler"),
           notify: data.fetch("notify", []),
           source_path: path
         )
       end
+    end
+
+    def valid_rule_name?(name)
+      name.is_a?(String) && name.match?(/\A[a-zA-Z0-9][a-zA-Z0-9._-]*\z/)
     end
 
     def matches_rule?(rule, frontmatter, body, full_text)

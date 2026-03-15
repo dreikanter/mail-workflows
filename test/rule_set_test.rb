@@ -141,6 +141,26 @@ class RuleSetTest < Minitest::Test
     assert_equal "first", result.name
   end
 
+  # --- Rule name validation ---
+
+  def test_rejects_rule_with_path_traversal_name
+    write_rule("bad.yml", name: "../../etc", match: { "from" => "a@b.com" })
+    rule_set = MailWorkflows::RuleSet.new(@tmpdir)
+    assert_empty rule_set.rules
+  end
+
+  def test_rejects_rule_with_slash_in_name
+    write_rule("bad.yml", name: "foo/bar", match: { "from" => "a@b.com" })
+    rule_set = MailWorkflows::RuleSet.new(@tmpdir)
+    assert_empty rule_set.rules
+  end
+
+  def test_accepts_rule_with_valid_name_characters
+    write_rule("ok.yml", name: "bank-statements_v2.1", match: { "from" => "a@b.com" })
+    rule_set = MailWorkflows::RuleSet.new(@tmpdir)
+    assert_equal 1, rule_set.rules.size
+  end
+
   # --- Empty match ---
 
   def test_empty_match_never_matches
