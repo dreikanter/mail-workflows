@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 require "yaml"
-require_relative "maildir"
-
 module MailWorkflows
   # Manages all Maildir folders across configured accounts.
   # Reads account configuration from accounts.yml and provides

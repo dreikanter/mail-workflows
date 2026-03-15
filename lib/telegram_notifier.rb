@@ -3,8 +3,6 @@
 require "net/http"
 require "uri"
 require "yaml"
-require_relative "log"
-
 module MailWorkflows
   # Sends handler summary via Telegram Bot API.
   class TelegramNotifier

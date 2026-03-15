@@ -1,9 +1,6 @@
 # frozen_string_literal: true
 
 require "yaml"
-require_relative "log"
-require_relative "mailer"
-
 module MailWorkflows
   # Sends handler output via email using the existing Mailer.
   class EmailNotifier

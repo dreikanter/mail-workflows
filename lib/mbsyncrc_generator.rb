@@ -2,8 +2,6 @@
 
 require "yaml"
 require "fileutils"
-require_relative "log"
-
 module MailWorkflows
   # Generates .mbsyncrc from accounts.yml and ensures Maildir directories exist.
   class MbsyncrcGenerator

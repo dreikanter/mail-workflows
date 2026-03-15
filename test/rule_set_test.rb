@@ -2,10 +2,6 @@
 
 require_relative "test_helper"
 
-$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
-require "log"
-require "rule_set"
-
 class RuleSetTest < Minitest::Test
   def setup
     @tmpdir = Dir.mktmpdir("rule-set-test")

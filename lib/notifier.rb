@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "log"
-require_relative "email_notifier"
-require_relative "telegram_notifier"
 module MailWorkflows
   # Dispatches notifications to the correct notifier type.
   module Notifier

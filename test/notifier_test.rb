@@ -2,11 +2,6 @@
 
 require_relative "test_helper"
 
-$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
-require "log"
-require "telegram_notifier"
-require "email_notifier"
-
 class TelegramNotifierTest < Minitest::Test
   def test_escapes_markdown_v2_characters
     notifier = MailWorkflows::TelegramNotifier.allocate

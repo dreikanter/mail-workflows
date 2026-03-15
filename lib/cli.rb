@@ -5,8 +5,6 @@ require "fileutils"
 require "shellwords"
 require "tmpdir"
 require "yaml"
-require_relative "version"
-
 module MailWorkflows
   class CLI
     CRON_MARKER = "# mail-workflows"
@@ -91,12 +89,6 @@ module MailWorkflows
     end
 
     def cmd_run
-      require_relative "log"
-      require_relative "mbsyncrc_generator"
-      require_relative "maildir_store"
-      require_relative "normalizer"
-      require_relative "processor"
-
       lock_path = File.join(@home, ".lock")
       FileUtils.mkdir_p(File.dirname(lock_path))
       lock_file = File.open(lock_path, File::CREAT | File::WRONLY)

@@ -7,9 +7,6 @@ require "digest"
 require "cgi"
 require "fileutils"
 require "time"
-require_relative "slug"
-require_relative "log"
-
 module MailWorkflows
   # Converts raw .eml files into LLM-ready markdown with YAML frontmatter
   # and extracts attachments to a separate directory.

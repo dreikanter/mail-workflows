@@ -1,9 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "log"
-require_relative "llm_handler"
-require_relative "script_handler"
-
 module MailWorkflows
   # Dispatches to the correct handler type based on rule config.
   module Handler

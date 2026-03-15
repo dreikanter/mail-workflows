@@ -5,8 +5,6 @@ require "open3"
 require "timeout"
 require "yaml"
 require "fileutils"
-require_relative "log"
-
 module MailWorkflows
   # Runs claude -p with an assembled prompt template.
   class LlmHandler

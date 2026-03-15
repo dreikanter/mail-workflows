@@ -5,12 +5,6 @@ require "json"
 require "digest"
 require "fileutils"
 require "time"
-require_relative "log"
-require_relative "slug"
-require_relative "rule_set"
-require_relative "handler"
-require_relative "notifier"
-
 module MailWorkflows
   # Processes normalized emails against rules: matches, runs handlers,
   # saves output, sends notifications, and manages file lifecycle.

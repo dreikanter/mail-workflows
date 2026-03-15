@@ -2,9 +2,6 @@
 
 require_relative "test_helper"
 
-$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
-require "cli"
-
 class CLITest < Minitest::Test
   def setup
     @tmpdir = Dir.mktmpdir("cli-test")

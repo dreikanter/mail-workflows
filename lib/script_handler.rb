@@ -3,8 +3,6 @@
 require "json"
 require "open3"
 require "timeout"
-require_relative "log"
-
 module MailWorkflows
   # Runs an arbitrary executable with JSON input on stdin.
   class ScriptHandler

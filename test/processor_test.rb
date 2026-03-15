@@ -2,10 +2,6 @@
 
 require_relative "test_helper"
 
-$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
-require "log"
-require "processor"
-
 class ProcessorTest < Minitest::Test
   def setup
     @tmpdir = Dir.mktmpdir("processor-test")
