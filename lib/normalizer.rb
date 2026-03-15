@@ -23,7 +23,7 @@ module MailWorkflows
     def normalize(eml_path, account:, folder:)
       @logger.info "reading #{File.basename(eml_path)}"
       msg = Mail.read(eml_path)
-      message_id = msg.message_id || Digest::SHA256.hexdigest(File.read(eml_path))
+      message_id = msg.message_id || Digest::SHA256.hexdigest(msg.raw_source)
 
       if already_normalized?(account, message_id)
         @logger.info "skip: already normalized message_id=#{message_id}"
@@ -321,7 +321,9 @@ module MailWorkflows
       # filenames. Protect literal "+" first since CGI.unescape treats it
       # as space (HTML form convention), but in filenames "+" is literal.
       # Then sanitize "+" to "-" to avoid shell/URL issues.
-      CGI.unescape(name.gsub("+", "%2B")).tr("+", "-")
+      name = CGI.unescape(name.gsub("+", "%2B")).tr("+", "-")
+      # Strip path separators to prevent directory traversal
+      File.basename(name)
     end
 
     def extract_attachments(msg, stem)

@@ -173,14 +173,14 @@ module MailWorkflows
       dest_dir = File.join(@home, "normalized", account, "processed")
       FileUtils.mkdir_p(dest_dir)
       dest = File.join(dest_dir, File.basename(md_path))
-      File.rename(md_path, dest)
+      FileUtils.mv(md_path, dest)
     end
 
     def move_to_failed(md_path, account)
       dest_dir = File.join(@home, "normalized", account, "failed")
       FileUtils.mkdir_p(dest_dir)
       dest = File.join(dest_dir, File.basename(md_path))
-      File.rename(md_path, dest)
+      FileUtils.mv(md_path, dest)
     end
 
   end

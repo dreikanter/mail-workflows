@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "mail"
+require "open3"
 require "yaml"
 module MailWorkflows
   # Sends email via SMTP using credentials from accounts.yml.
@@ -70,15 +71,15 @@ module MailWorkflows
 
     def resolve_password
       cmd = config.fetch("smtp_pass_cmd")
-      password = `#{cmd}`.chomp
-      raise "smtp_pass_cmd failed (exit #{$?.exitstatus}): #{cmd}" unless $?.success?
+      stdout, stderr, status = Open3.capture3(cmd)
+      raise "smtp_pass_cmd failed (exit #{status.exitstatus}): #{cmd}: #{stderr.chomp}" unless status.success?
 
-      password
+      stdout.chomp
     end
 
     def load_config
       path = File.join(@home, "accounts.yml")
-      yaml = YAML.load_file(path)
+      yaml = YAML.safe_load_file(path, permitted_classes: [Symbol])
       email_config = yaml.dig("notifications", "email")
       raise "missing notifications.email in #{path}" unless email_config
 

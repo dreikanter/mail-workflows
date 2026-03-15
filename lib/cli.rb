@@ -145,7 +145,7 @@ module MailWorkflows
 
       accounts_path = File.join(@home, "accounts.yml")
       if File.exist?(accounts_path)
-        config = YAML.load_file(accounts_path, permitted_classes: [Symbol]) || {}
+        config = YAML.safe_load_file(accounts_path, permitted_classes: [Symbol]) || {}
         accounts = config.fetch("accounts", {})
         if accounts.any?
           puts "Accounts:"
@@ -207,10 +207,8 @@ module MailWorkflows
 
       store.each_new_message do |filepath, maildir, account, folder|
         result = normalizer.normalize(filepath, account: account, folder: folder)
-        if result
-          maildir.mark_processed(filepath)
-          count += 1
-        end
+        maildir.mark_processed(filepath)
+        count += 1 if result
       rescue StandardError => e
         errors += 1
         log.error "failed to normalize #{File.basename(filepath)}: #{e.message}"

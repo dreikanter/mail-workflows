@@ -52,7 +52,7 @@ module MailWorkflows
     private
 
     def config
-      @config ||= YAML.load_file(accounts_path, permitted_classes: [Symbol])
+      @config ||= YAML.safe_load_file(accounts_path, permitted_classes: [Symbol])
     end
 
     def accounts
