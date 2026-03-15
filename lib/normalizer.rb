@@ -17,8 +17,10 @@ module MailWorkflows
       @home = home
     end
 
+    Result = Struct.new(:path, :from, :message_id, :attachments, keyword_init: true)
+
     # Normalize a single .eml file.
-    # Returns the output .md path on success, nil if skipped (already normalized).
+    # Returns a Result on success, nil if skipped (already normalized).
     def normalize(eml_path, account:, folder:)
       msg = Mail.read(eml_path)
       message_id = msg.message_id || Digest::SHA256.hexdigest(File.read(eml_path))
@@ -42,7 +44,13 @@ module MailWorkflows
         msg, stem, account, folder, message_id, filenames,
         body: body, fwd: fwd
       )
-      md_path
+
+      Result.new(
+        path: md_path,
+        from: format_address(msg[:from]),
+        message_id: message_id,
+        attachments: filenames
+      )
     end
 
     private

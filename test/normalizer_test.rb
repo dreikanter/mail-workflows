@@ -24,10 +24,10 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    assert md_path
-    content = File.read(md_path)
+    assert result
+    content = File.read(result.path)
     assert_match(/^message_id:/, content)
     assert_match(/^from:.*alice@example\.com/, content)
     assert_match(/^to:.*bob@example\.com/, content)
@@ -46,9 +46,9 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    content = File.read(md_path)
+    content = File.read(result.path)
     # Should contain markdown-converted content
     assert_includes content, "Hello"
     assert_includes content, "bold"
@@ -67,9 +67,9 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    content = File.read(md_path)
+    content = File.read(result.path)
     assert_includes content, "Plain text version."
   end
 
@@ -83,8 +83,8 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
-    stem = File.basename(md_path, ".md")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    stem = File.basename(result.path, ".md")
 
     att_dir = File.join(@tmpdir, "attachments", stem)
     assert Dir.exist?(att_dir), "attachments directory should exist"
@@ -92,7 +92,7 @@ class NormalizerTest < Minitest::Test
     assert_equal "fake pdf content", File.read(File.join(att_dir, "report.pdf"))
 
     # Frontmatter should list attachment
-    content = File.read(md_path)
+    content = File.read(result.path)
     assert_match(/attachments:/, content)
     assert_match(/report\.pdf/, content)
   end
@@ -113,8 +113,8 @@ class NormalizerTest < Minitest::Test
     mail.add_part(inline)
     path = write_eml(mail.to_s)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
-    stem = File.basename(md_path, ".md")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    stem = File.basename(result.path, ".md")
 
     att_dir = File.join(@tmpdir, "attachments", stem)
     assert Dir.exist?(att_dir), "attachments dir should exist for inline images"
@@ -130,9 +130,9 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    assert_match(/invoice-from-acme-corp\.md\z/, md_path)
+    assert_match(/invoice-from-acme-corp\.md\z/, result.path)
   end
 
   def test_handles_non_ascii_subject
@@ -144,9 +144,9 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    assert_match(/cafe-resume\.md\z/, md_path)
+    assert_match(/cafe-resume\.md\z/, result.path)
   end
 
   def test_handles_empty_subject
@@ -158,9 +158,9 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    assert_match(/no-subject\.md\z/, md_path)
+    assert_match(/no-subject\.md\z/, result.path)
   end
 
   def test_decodes_quoted_printable_body
@@ -173,9 +173,9 @@ class NormalizerTest < Minitest::Test
     mail.body = "Hello =C3=BCber world"
     path = write_eml(mail.to_s)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    content = File.read(md_path)
+    content = File.read(result.path)
     assert_includes content, "über"
   end
 
@@ -189,9 +189,9 @@ class NormalizerTest < Minitest::Test
     mail.body = ["Hello base64 world"].pack("m")
     path = write_eml(mail.to_s)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    content = File.read(md_path)
+    content = File.read(result.path)
     assert_includes content, "Hello base64 world"
   end
 
@@ -209,12 +209,12 @@ class NormalizerTest < Minitest::Test
     mail.add_part(att)
     path = write_eml(mail.to_s)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
-    stem = File.basename(md_path, ".md")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    stem = File.basename(result.path, ".md")
     att_dir = File.join(@tmpdir, "attachments", stem)
 
     # Parse attachment names from frontmatter
-    content = File.read(md_path)
+    content = File.read(result.path)
     frontmatter = YAML.safe_load(content.split("---\n")[1])
     listed_names = frontmatter["attachments"]
 
@@ -239,11 +239,11 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
-    stem = File.basename(md_path, ".md")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    stem = File.basename(result.path, ".md")
     att_dir = File.join(@tmpdir, "attachments", stem)
 
-    content = File.read(md_path)
+    content = File.read(result.path)
     frontmatter = YAML.safe_load(content.split("---\n")[1])
     listed_names = frontmatter["attachments"]
 
@@ -264,11 +264,11 @@ class NormalizerTest < Minitest::Test
     path1 = write_eml(eml)
     path2 = write_eml(eml, "copy.eml")
 
-    md_path1 = @normalizer.normalize(path1, account: "personal", folder: "INBOX")
-    md_path2 = @normalizer.normalize(path2, account: "personal", folder: "INBOX")
+    result1 = @normalizer.normalize(path1, account: "personal", folder: "INBOX")
+    result2 = @normalizer.normalize(path2, account: "personal", folder: "INBOX")
 
-    assert md_path1, "first normalization should succeed"
-    assert_nil md_path2, "second normalization should be skipped"
+    assert result1, "first normalization should succeed"
+    assert_nil result2, "second normalization should be skipped"
   end
 
   def test_collision_suffix_on_filename_clash
@@ -280,14 +280,14 @@ class NormalizerTest < Minitest::Test
     path1 = write_eml(eml1, "msg1.eml")
     path2 = write_eml(eml2, "msg2.eml")
 
-    md1 = @normalizer.normalize(path1, account: "personal", folder: "INBOX")
-    md2 = @normalizer.normalize(path2, account: "personal", folder: "INBOX")
+    result1 = @normalizer.normalize(path1, account: "personal", folder: "INBOX")
+    result2 = @normalizer.normalize(path2, account: "personal", folder: "INBOX")
 
-    assert md1
-    assert md2
-    refute_equal md1, md2
+    assert result1
+    assert result2
+    refute_equal result1.path, result2.path
     # One should have a suffix
-    stems = [File.basename(md1, ".md"), File.basename(md2, ".md")]
+    stems = [File.basename(result1.path, ".md"), File.basename(result2.path, ".md")]
     assert stems.any? { |s| s.match?(/_[0-9a-f]{8}\z/) }, "expected collision suffix on one file"
   end
 
@@ -304,8 +304,8 @@ class NormalizerTest < Minitest::Test
     eml = build_eml(from: "a@example.com", to: "b@example.com", subject: "No Atts", body: "plain")
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
-    stem = File.basename(md_path, ".md")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    stem = File.basename(result.path, ".md")
 
     refute Dir.exist?(File.join(@tmpdir, "attachments", stem))
   end
@@ -319,9 +319,9 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    content = File.read(md_path)
+    content = File.read(result.path)
     assert_includes content, "Main content."
     refute_includes content, "CEO, Example Corp"
   end
@@ -338,9 +338,9 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    content = File.read(md_path)
+    content = File.read(result.path)
     frontmatter = YAML.safe_load(content.split("---\n")[1])
 
     assert_equal "Acme Corp <no-reply@acme.example.com>", frontmatter["from"]
@@ -363,9 +363,9 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    content = File.read(md_path)
+    content = File.read(result.path)
     refute_includes content, "Forwarded message"
     refute_includes content, "From: sender@example.com"
     assert_includes content, "Actual content here."
@@ -383,9 +383,9 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    assert_match(/original-topic\.md\z/, md_path)
+    assert_match(/original-topic\.md\z/, result.path)
   end
 
   def test_forwarded_message_uses_original_date_in_stem
@@ -400,9 +400,9 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    assert_match(/\A20260302-/, File.basename(md_path))
+    assert_match(/\A20260302-/, File.basename(result.path))
   end
 
   def test_forwarded_date_with_narrow_non_breaking_space
@@ -417,9 +417,9 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    content = File.read(md_path)
+    content = File.read(result.path)
     frontmatter = YAML.safe_load(content.split("---\n")[1])
     assert_match(/\A2026-03-03T12:31:00/, frontmatter["date"])
   end
@@ -437,9 +437,9 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    content = File.read(md_path)
+    content = File.read(result.path)
     frontmatter = YAML.safe_load(content.split("---\n")[1])
     assert_equal ["invoice.pdf"], frontmatter["attachments"]
     assert_equal "billing@example.com", frontmatter["from"]
@@ -455,9 +455,9 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    content = File.read(md_path)
+    content = File.read(result.path)
     frontmatter = YAML.safe_load(content.split("---\n")[1])
     assert_nil frontmatter["forwarded_by"]
     assert_nil frontmatter["forwarded_date"]
@@ -474,9 +474,9 @@ class NormalizerTest < Minitest::Test
     mail["X-Forwarded-To"] = "inbox@example.net"
     path = write_eml(mail.to_s)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    content = File.read(md_path)
+    content = File.read(result.path)
     frontmatter = YAML.safe_load(content.split("---\n")[1])
 
     assert_match(/Original Sender/, frontmatter["from"])
@@ -505,9 +505,9 @@ class NormalizerTest < Minitest::Test
     mail["X-Forwarded-For"] = "some-other@example.com"
     path = write_eml(mail.to_s)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    content = File.read(md_path)
+    content = File.read(result.path)
     frontmatter = YAML.safe_load(content.split("---\n")[1])
 
     assert_equal "original@example.com", frontmatter["from"]
@@ -524,10 +524,10 @@ class NormalizerTest < Minitest::Test
     )
     path = write_eml(eml)
 
-    md_path = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    assert md_path
-    content = File.read(md_path)
+    assert result
+    content = File.read(result.path)
     assert_match(/^to:/, content)
   end
 
