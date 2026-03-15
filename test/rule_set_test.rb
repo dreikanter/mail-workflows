@@ -161,6 +161,32 @@ class RuleSetTest < Minitest::Test
     assert_equal 1, rule_set.rules.size
   end
 
+  # --- Invalid rule files ---
+
+  def test_raises_on_rule_missing_name
+    File.write(File.join(@rules_dir, "bad.yml"), YAML.dump({ "match" => {}, "handler" => { "type" => "script" } }))
+
+    assert_raises(KeyError) do
+      MailWorkflows::RuleSet.new(@tmpdir)
+    end
+  end
+
+  def test_raises_on_rule_missing_handler
+    File.write(File.join(@rules_dir, "bad.yml"), YAML.dump({ "name" => "test", "match" => {} }))
+
+    assert_raises(KeyError) do
+      MailWorkflows::RuleSet.new(@tmpdir)
+    end
+  end
+
+  def test_raises_on_invalid_yaml_syntax
+    File.write(File.join(@rules_dir, "bad.yml"), "name: test\n  broken: indentation\n foo")
+
+    assert_raises(Psych::SyntaxError) do
+      MailWorkflows::RuleSet.new(@tmpdir)
+    end
+  end
+
   # --- Empty match ---
 
   def test_empty_match_never_matches
