@@ -83,6 +83,9 @@ module MailWorkflows
     def matches?(text, pattern)
       regex = parse_pattern(pattern)
       regex ? text.match?(regex) : text.include?(pattern)
+    rescue Regexp::TimeoutError
+      @logger.error "regex timed out for pattern: #{pattern}"
+      false
     end
 
     # Parses /pattern/flags syntax into a Regexp, or returns nil for plain strings.
@@ -94,7 +97,7 @@ module MailWorkflows
       flags |= Regexp::IGNORECASE if m[2].include?("i")
       flags |= Regexp::MULTILINE if m[2].include?("m")
       flags |= Regexp::EXTENDED if m[2].include?("x")
-      Regexp.new(m[1], flags)
+      Regexp.new(m[1], flags, timeout: 1)
     end
 
     def frontmatter_text(frontmatter)
