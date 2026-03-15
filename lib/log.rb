@@ -6,8 +6,8 @@ module MailWorkflows
   # Creates a logger that writes to both stderr and a log file.
   # Levels: DEBUG, INFO, WARN, ERROR
   def self.create_logger(level: Logger::INFO, home: nil)
-    formatter = proc do |severity, _time, _prog, msg|
-      "#{severity[0]} #{msg}\n"
+    formatter = proc do |severity, time, _prog, msg|
+      "#{time.strftime("%Y-%m-%d %H:%M:%S")} #{severity[0]} #{msg}\n"
     end
 
     targets = [$stderr]
