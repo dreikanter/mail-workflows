@@ -80,7 +80,7 @@ module MailWorkflows
         end
       end
 
-      %w[rules prompts mail normalized attachments artifacts log].each do |dir|
+      %w[rules prompts mail normalized attachments artifacts state log].each do |dir|
         FileUtils.mkdir_p(File.join(path, dir))
       end
 
@@ -95,6 +95,7 @@ module MailWorkflows
       require_relative "mbsyncrc_generator"
       require_relative "maildir_store"
       require_relative "normalizer"
+      require_relative "processor"
 
       lock_path = File.join(@home, ".lock")
       FileUtils.mkdir_p(File.dirname(lock_path))
@@ -220,6 +221,9 @@ module MailWorkflows
       end
 
       log.info "done: #{count} normalized, #{errors} errors"
+
+      processor = MailWorkflows::Processor.new(@home, logger: log)
+      processor.run
     end
 
     # --- Helpers ---
