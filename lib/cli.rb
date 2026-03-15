@@ -256,6 +256,7 @@ module MailWorkflows
 
     def install_crontab(lines)
       IO.popen("crontab -", "w") { |io| io.puts lines.join("\n") }
+      abort "Failed to install crontab" unless $?.success?
     end
 
     def accounts_template
