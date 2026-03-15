@@ -193,19 +193,26 @@ class LlmHandlerTest < Minitest::Test
       {{PREPROCESSED}}
     MD
 
+    captured_stdin = nil
     handler = MailWorkflows::LlmHandler.new(@tmpdir)
-    # Use send to test private method
-    prompt = handler.send(:assemble_prompt, "test", sample_input)
+    status = stub_success_status
 
-    assert_includes prompt, "Test body content"
-    assert_includes prompt, "Analyze this email"
+    Open3.stub(:capture3, ->(*_args, stdin_data: nil, **_kw) {
+      captured_stdin = stdin_data
+      [claude_json_response("prompt check"), "", status]
+    }) do
+      handler.execute({ "prompt" => "test" }, sample_input)
+    end
+
+    assert_includes captured_stdin, "Test body content"
+    assert_includes captured_stdin, "Analyze this email"
   end
 
   def test_raises_on_missing_prompt_template
     handler = MailWorkflows::LlmHandler.new(@tmpdir)
 
     assert_raises(RuntimeError) do
-      handler.send(:assemble_prompt, "nonexistent", sample_input)
+      handler.execute({ "prompt" => "nonexistent" }, sample_input)
     end
   end
 
@@ -216,39 +223,45 @@ class LlmHandlerTest < Minitest::Test
       "preprocessed" => { "doc.pdf" => "Extracted PDF content here" }
     )
 
+    captured_stdin = nil
     handler = MailWorkflows::LlmHandler.new(@tmpdir)
-    prompt = handler.send(:assemble_prompt, "test", input)
+    status = stub_success_status
 
-    assert_includes prompt, "## doc.pdf"
-    assert_includes prompt, "Extracted PDF content here"
+    Open3.stub(:capture3, ->(*_args, stdin_data: nil, **_kw) {
+      captured_stdin = stdin_data
+      [claude_json_response("preprocessed check"), "", status]
+    }) do
+      handler.execute({ "prompt" => "test" }, input)
+    end
+
+    assert_includes captured_stdin, "## doc.pdf"
+    assert_includes captured_stdin, "Extracted PDF content here"
   end
 
   def test_parses_claude_json_output
-    handler = MailWorkflows::LlmHandler.new(@tmpdir)
+    File.write(File.join(@prompts_dir, "test.md"), "{{EMAIL_CONTENT}}")
 
-    # Simulate claude --output-format json wrapping
+    handler = MailWorkflows::LlmHandler.new(@tmpdir)
+    status = stub_success_status
+
     claude_output = JSON.generate({
       "type" => "result",
       "result" => '{"summary": "parsed ok", "body": "detail", "data": {}}'
     })
 
-    result = handler.send(:parse_claude_output, claude_output)
-    assert_equal "parsed ok", result["summary"]
+    Open3.stub(:capture3, [claude_output, "", status]) do
+      result = handler.execute({ "prompt" => "test" }, sample_input)
+      assert_equal "parsed ok", result["summary"]
+    end
   end
 
   def test_execute_success
     File.write(File.join(@prompts_dir, "test.md"), "Analyze: {{EMAIL_CONTENT}}")
 
-    claude_response = JSON.generate({
-      "type" => "result",
-      "result" => '{"summary": "test result", "body": "", "data": {}}'
-    })
-
     handler = MailWorkflows::LlmHandler.new(@tmpdir)
-    status = Minitest::Mock.new
-    status.expect(:success?, true)
+    status = stub_success_status
 
-    Open3.stub(:capture3, [claude_response, "", status]) do
+    Open3.stub(:capture3, [claude_json_response("test result"), "", status]) do
       result = handler.execute({ "prompt" => "test" }, sample_input)
       assert_equal "test result", result["summary"]
     end
@@ -297,5 +310,18 @@ class LlmHandlerTest < Minitest::Test
       "state_dir" => @state_dir,
       "config" => {}
     }
+  end
+
+  def stub_success_status
+    status = Object.new
+    status.define_singleton_method(:success?) { true }
+    status
+  end
+
+  def claude_json_response(summary)
+    JSON.generate({
+      "type" => "result",
+      "result" => JSON.generate({ "summary" => summary, "body" => "", "data" => {} })
+    })
   end
 end
