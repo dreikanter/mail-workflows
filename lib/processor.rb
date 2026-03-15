@@ -18,7 +18,7 @@ module MailWorkflows
     # Process all pending normalized emails across all accounts.
     # Returns counts: {processed:, matched:, failed:, errors:}
     def run
-      counts = { processed: 0, matched: 0, failed: 0, errors: 0 }
+      counts = { processed: 0, matched: 0, failed: 0, errors: 0, notification_errors: 0 }
 
       each_pending_email do |md_path, account|
         process_email(md_path, account, counts)
@@ -77,7 +77,7 @@ module MailWorkflows
       end
 
       save_output(rule, frontmatter, output)
-      send_notifications(rule, output, frontmatter)
+      send_notifications(rule, output, frontmatter, counts)
       move_to_processed(md_path, account)
       counts[:matched] += 1
       @logger.info "handled: #{File.basename(md_path)} → #{rule.name}"
@@ -154,7 +154,7 @@ module MailWorkflows
       @logger.info "saved output: #{path}"
     end
 
-    def send_notifications(rule, output, frontmatter)
+    def send_notifications(rule, output, frontmatter, counts)
       metadata = {
         from: frontmatter["from"],
         subject: frontmatter["subject"],
@@ -165,6 +165,7 @@ module MailWorkflows
       rule.notify.each do |notify_config|
         Notifier.notify(notify_config, output, metadata, home: @home, logger: @logger)
       rescue StandardError => e
+        counts[:notification_errors] += 1
         @logger.error "notification failed (#{notify_config["type"]}): #{e.message}"
       end
     end
