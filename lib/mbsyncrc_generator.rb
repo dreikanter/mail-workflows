@@ -14,8 +14,9 @@ module MailWorkflows
       config = YAML.load_file(File.join(@home, "accounts.yml"))
       accounts = config.fetch("accounts", {})
 
-      generate_rc(accounts)
+      rc_path = generate_rc(accounts)
       create_maildirs(accounts)
+      rc_path
     end
 
     private
