@@ -28,19 +28,18 @@ bin/init
 $EDITOR ~/.mail-workflows/accounts.yml
 ```
 
-## Syncing Mail
+## Running
 
 ```bash
-bin/sync
+bin/run
 ```
 
-This runs the full pipeline:
+This is the main entry point. It acquires a lock (to prevent concurrent runs), then:
 
-1. Generates `~/.mail-workflows/.mbsyncrc` from `accounts.yml`
-2. Ensures Maildir directories exist
-3. Runs `mbsync` to pull new messages from IMAP
-4. Normalizes new messages into LLM-ready markdown with YAML frontmatter
-5. Extracts attachments to `~/.mail-workflows/attachments/<stem>/`
+1. **Sync** — generates `.mbsyncrc`, runs `mbsync` to pull new mail, normalizes messages into markdown
+2. **Process** — matches normalized messages against rules, runs preprocessing and handlers *(coming soon)*
+
+You can also run `bin/sync` directly to sync and normalize without processing.
 
 Normalized messages go to `~/.mail-workflows/normalized/<account>/new/`.
 
@@ -85,6 +84,39 @@ To update an existing password, delete and re-add:
 security delete-generic-password -s mail-workflows-personal
 security add-generic-password -s mail-workflows-personal -a "$USER" -w "new-app-password"
 ```
+
+## Scheduling
+
+On macOS, use launchd to run `bin/run` every 5 minutes. The included plist template needs two paths: the repo `bin/` directory and the data directory.
+
+### Enable
+
+```bash
+# Copy and configure the plist
+PLIST=~/Library/LaunchAgents/com.mail-workflows.run.plist
+cp defaults/com.mail-workflows.run.plist "$PLIST"
+
+# Replace placeholders with actual paths
+sed -i '' "s|MAIL_WORKFLOWS_BIN|$HOME/mail-workflows/bin|g" "$PLIST"
+sed -i '' "s|MAIL_WORKFLOWS_HOME|$HOME/.mail-workflows|g" "$PLIST"
+
+# Load the schedule
+launchctl load "$PLIST"
+```
+
+### Disable
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.mail-workflows.run.plist
+```
+
+### Check status
+
+```bash
+launchctl list | grep mail-workflows
+```
+
+To run manually at any time: `bin/run`
 
 ## Development
 
