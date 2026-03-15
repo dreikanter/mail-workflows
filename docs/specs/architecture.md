@@ -29,6 +29,7 @@ cron (every N minutes)
               +-- parse MIME (mail gem)
               +-- write markdown + YAML frontmatter → normalized/
               +-- extract attachments → attachments/
+              +-- convert PDF attachments to Markdown (MarkItDown)
               +-- move .eml to cur/ (marks as synced)
 ```
 
@@ -184,6 +185,9 @@ Frontmatter fields: `message_id`, `from`, `to`, `subject`, `date` (ISO 8601),
 - Inline images are also extracted
 - On filename collision within a message: `invoice.pdf`, `invoice-2.pdf`
 - MIME-encoded filenames are decoded
+- PDF attachments are converted to Markdown using
+  [MarkItDown](https://github.com/microsoft/markitdown) and saved alongside
+  the original (e.g., `invoice.pdf` → `invoice.pdf.md`)
 
 **Forwarded message detection:**
 

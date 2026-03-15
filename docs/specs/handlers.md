@@ -7,7 +7,7 @@ incoming email is matched against a set of rules. When a rule matches, its
 handler processes the email and optionally sends notifications.
 
 ```
-[normalized .md] → [rule match] → [preprocess] → [handler] → [notify]
+[normalized .md] → [rule match] → [handler] → [notify]
 ```
 
 ## Rules
@@ -56,19 +56,6 @@ notify:
   - type: email
     to: user@gmail.com
 ```
-
-## Preprocessing
-
-Preprocessing is automatic and identical for all emails — not configurable
-per rule.
-
-After normalization, if an email has PDF attachments, each PDF is converted
-to Markdown using [MarkItDown](https://github.com/microsoft/markitdown)
-(`pipx install 'markitdown[pdf]'`). The converted text is stored alongside
-the attachment and included in the handler input as `preprocessed` content.
-
-Future preprocessing steps (OCR, other document types) follow the same
-pattern: run eagerly on all emails, make results available to handlers.
 
 ## Handler Interface
 
@@ -245,13 +232,12 @@ for each .md in normalized/<account>/new/:
   1. Parse frontmatter
   2. Find first matching rule (filename order)
   3. If no match → move to processed/
-  4. Load preprocessed content (PDF→Markdown results, if any)
-  5. Build handler input JSON
-  6. Execute handler (llm / agent / script)
-  7. On failure (non-zero exit):
+  4. Build handler input JSON (includes preprocessed PDF content from attachments/)
+  5. Execute handler (llm / script)
+  6. On failure (non-zero exit):
        increment retry count, skip
        after 3 failures → move to failed/
-  8. On success:
+  7. On success:
        save output to state/<rule>/
        run each notifier
        move .md to processed/
@@ -274,8 +260,7 @@ containing the failure count as a plain integer.
 mail-workflows/                  # tool repo
   lib/
     rule_matcher.rb              # rule loading, matching logic
-    handler_runner.rb            # handler dispatch (llm/agent/script)
-    preprocessor.rb              # PDF→Markdown conversion
+    handler_runner.rb            # handler dispatch (llm/script)
     notifier.rb                  # notification dispatch
   handlers/                      # shipped example handler scripts
     track-payment
@@ -288,7 +273,6 @@ mail-workflows/                  # tool repo
 
 | Dependency | Purpose | Install |
 |-----------|---------|---------|
-| MarkItDown | PDF → Markdown | `pipx install 'markitdown[pdf]'` |
 | Claude Code | `type: llm` handlers | `npm install -g @anthropic-ai/claude-code` |
 
 ## Open Questions
