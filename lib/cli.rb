@@ -101,6 +101,9 @@ module MailWorkflows
       log = MailWorkflows.create_logger(home: @home)
       errors = sync_mail(log)
       exit 1 if errors > 0
+    ensure
+      lock_file&.close
+      log&.close
     end
 
     def cmd_schedule
