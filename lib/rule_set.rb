@@ -61,7 +61,7 @@ module MailWorkflows
     end
 
     def valid_rule_name?(name)
-      name.is_a?(String) && name.match?(/\A[a-zA-Z0-9][a-zA-Z0-9._-]*\z/)
+      name.is_a?(String) && name.match?(/\A[a-zA-Z0-9_][a-zA-Z0-9._-]*\z/)
     end
 
     def matches_rule?(rule, frontmatter, body, full_text)
