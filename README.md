@@ -34,7 +34,15 @@ $EDITOR ~/.mail-workflows/accounts.yml
 bin/sync
 ```
 
-This generates `~/.mail-workflows/.mbsyncrc` from your `accounts.yml` and runs `mbsync` to pull new messages into `~/.mail-workflows/mail/<account>/<folder>/new/`.
+This runs the full pipeline:
+
+1. Generates `~/.mail-workflows/.mbsyncrc` from `accounts.yml`
+2. Ensures Maildir directories exist
+3. Runs `mbsync` to pull new messages from IMAP
+4. Normalizes new messages into LLM-ready markdown with YAML frontmatter
+5. Extracts attachments to `~/.mail-workflows/attachments/<stem>/`
+
+Normalized messages go to `~/.mail-workflows/normalized/<account>/new/`.
 
 ## Passwords
 
