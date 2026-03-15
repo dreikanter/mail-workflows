@@ -170,16 +170,22 @@ module MailWorkflows
     end
 
     def move_to_processed(md_path, account)
-      dest_dir = File.join(@home, "normalized", account, "processed")
-      FileUtils.mkdir_p(dest_dir)
-      dest = File.join(dest_dir, File.basename(md_path))
-      FileUtils.mv(md_path, dest)
+      move_to_subdir(md_path, account, "processed")
     end
 
     def move_to_failed(md_path, account)
-      dest_dir = File.join(@home, "normalized", account, "failed")
+      move_to_subdir(md_path, account, "failed")
+    end
+
+    def move_to_subdir(md_path, account, subdir)
+      dest_dir = File.join(@home, "normalized", account, subdir)
       FileUtils.mkdir_p(dest_dir)
       dest = File.join(dest_dir, File.basename(md_path))
+      if File.exist?(dest)
+        stem = File.basename(md_path, ".md")
+        suffix = Digest::SHA256.hexdigest(File.read(md_path))[0, 8]
+        dest = File.join(dest_dir, "#{stem}_#{suffix}.md")
+      end
       FileUtils.mv(md_path, dest)
     end
 
