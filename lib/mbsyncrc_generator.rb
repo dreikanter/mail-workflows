@@ -37,7 +37,7 @@ module MailWorkflows
           folders = acct.fetch("folders", ["INBOX"])
           store_path = File.join(@home, "mail", name) + "/"
 
-          @logger.debug "account #{name}: #{acct["host"]}:#{acct.fetch("port", 993)} " \
+          @logger.info "account #{name}: #{acct["host"]}:#{acct.fetch("port", 993)} " \
                         "tls=#{tls_type} folders=#{folders.join(",")}"
 
           f.puts "IMAPAccount #{name}"
@@ -67,7 +67,7 @@ module MailWorkflows
         end
       end
 
-      @logger.info "wrote #{rc_path} (mode 0600)"
+      @logger.info "wrote #{rc_path}"
       rc_path
     end
 
@@ -76,7 +76,7 @@ module MailWorkflows
         acct.fetch("folders", ["INBOX"]).each do |folder|
           dir = File.join(@home, "mail", name, folder)
           %w[new cur tmp].each { |sub| FileUtils.mkdir_p(File.join(dir, sub)) }
-          @logger.debug "maildir ready: #{dir}"
+          @logger.info "maildir ready: #{dir}"
         end
       end
     end

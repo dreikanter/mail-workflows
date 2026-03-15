@@ -8,7 +8,7 @@
 #   2. Run mbsync to pull new mail
 #   3. Normalize new messages (extract body, attachments, write markdown)
 #
-# Usage: bin/sync [--home DIR] [--verbose]
+# Usage: bin/sync [--home DIR]
 
 $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
 require "log"
@@ -19,33 +19,26 @@ require "normalizer"
 # --- Parse arguments ---
 
 home = ENV.fetch("MAIL_WORKFLOWS_HOME", File.expand_path("~/.mail-workflows"))
-verbose = false
-
 args = ARGV.dup
 while args.any?
   case args.shift
   when "--home" then home = args.shift
-  when "--verbose", "-v" then verbose = true
   else
-    $stderr.puts "Usage: sync [--home DIR] [--verbose]"
+    $stderr.puts "Usage: sync [--home DIR]"
     exit 1
   end
 end
 
-level = verbose ? Logger::DEBUG : Logger::INFO
-log = MailWorkflows.create_logger(level: level, home: home)
+log = MailWorkflows.create_logger(home: home)
 
 # --- Step 1: Generate .mbsyncrc and prepare Maildir ---
 
-rc_path = MailWorkflows::MbsyncrcGenerator.new(home, logger: log).run
-log.info "generated #{rc_path}"
+MailWorkflows::MbsyncrcGenerator.new(home, logger: log).run
 
 # --- Step 2: Run mbsync ---
 
-rc_file = File.join(home, ".mbsyncrc")
-log.info "running mbsync"
-system("mbsync", "-c", rc_file, "-a", exception: true)
-log.info "mbsync complete"
+log.info "syncing mail"
+system("mbsync", "-c", File.join(home, ".mbsyncrc"), "-a", exception: true)
 
 # --- Step 3: Normalize new messages ---
 
@@ -64,7 +57,7 @@ store.each_new_message do |filepath, maildir, account, folder|
 rescue StandardError => e
   errors += 1
   log.error "failed to normalize #{File.basename(filepath)}: #{e.message}"
-  log.debug e.backtrace.first(5).join("\n")
+  log.info e.backtrace.first(5).join("\n")
 end
 
 log.info "done: #{count} normalized, #{errors} errors"

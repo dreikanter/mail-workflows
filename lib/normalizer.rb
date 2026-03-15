@@ -24,12 +24,12 @@ module MailWorkflows
     # Normalize a single .eml file.
     # Returns a Result on success, nil if skipped (already normalized).
     def normalize(eml_path, account:, folder:)
-      @logger.debug "reading #{File.basename(eml_path)}"
+      @logger.info "reading #{File.basename(eml_path)}"
       msg = Mail.read(eml_path)
       message_id = msg.message_id || Digest::SHA256.hexdigest(File.read(eml_path))
 
       if already_normalized?(account, message_id)
-        @logger.debug "skip: already normalized message_id=#{message_id}"
+        @logger.info "skip: already normalized message_id=#{message_id}"
         return nil
       end
 
@@ -53,10 +53,9 @@ module MailWorkflows
         body: body, fwd: fwd
       )
 
-      @logger.info "normalized: #{File.basename(md_path)}"
-      @logger.info "  from: #{format_address(msg[:from])}"
+      att_info = filenames.empty? ? "" : " attachments=#{filenames.join(", ")}"
+      @logger.info "normalized: #{File.basename(md_path)} from=#{format_address(msg[:from])}#{att_info}"
       @logger.info "  message-id: #{message_id}"
-      filenames.each { |a| @logger.info "  attachment: #{a}" }
 
       Result.new(
         path: md_path,
@@ -104,7 +103,7 @@ module MailWorkflows
       if collision?(out_dir, base_stem, account)
         mid = msg.message_id || ""
         suffix = Digest::SHA256.hexdigest(mid)[0, 8]
-        @logger.debug "stem collision for #{base_stem}, adding suffix #{suffix}"
+        @logger.info "stem collision for #{base_stem}, adding suffix #{suffix}"
         "#{base_stem}_#{suffix}"
       else
         base_stem
@@ -135,7 +134,7 @@ module MailWorkflows
 
       md_path = File.join(out_dir, "#{stem}.md")
       File.write(md_path, "#{frontmatter}\n#{body}\n")
-      @logger.debug "wrote #{md_path} (#{File.size(md_path)} bytes)"
+      @logger.info "wrote #{md_path} (#{File.size(md_path)} bytes)"
       md_path
     end
 
@@ -178,35 +177,35 @@ module MailWorkflows
         # Prefer text/plain
         plain = msg.text_part
         if plain
-          @logger.debug "body: using text/plain part"
+          @logger.info "body: using text/plain part"
           return plain.decoded
         end
 
         # Fall back to text/html -> markdown
         html = msg.html_part
         if html
-          @logger.debug "body: converting text/html to markdown"
+          @logger.info "body: converting text/html to markdown"
           return html_to_markdown(html.decoded)
         end
 
         # Try first text part
         msg.parts.each do |part|
           if part.content_type&.start_with?("text/plain")
-            @logger.debug "body: using text/plain from parts scan"
+            @logger.info "body: using text/plain from parts scan"
             return part.decoded
           end
           if part.content_type&.start_with?("text/html")
-            @logger.debug "body: converting text/html from parts scan"
+            @logger.info "body: converting text/html from parts scan"
             return html_to_markdown(part.decoded)
           end
         end
-        @logger.debug "body: no usable text part found"
+        @logger.info "body: no usable text part found"
         nil
       elsif msg.content_type&.start_with?("text/html")
-        @logger.debug "body: converting single-part text/html"
+        @logger.info "body: converting single-part text/html"
         html_to_markdown(msg.decoded)
       else
-        @logger.debug "body: using single-part text/plain"
+        @logger.info "body: using single-part text/plain"
         msg.decoded
       end
     rescue Mail::UnknownEncodingType, Encoding::UndefinedConversionError => e
@@ -334,7 +333,7 @@ module MailWorkflows
 
       out_dir = File.join(attachments_dir, stem)
       FileUtils.mkdir_p(out_dir)
-      @logger.debug "extracting #{attachments.size} attachment(s) to #{out_dir}"
+      @logger.info "extracting #{attachments.size} attachment(s) to #{out_dir}"
 
       filenames = []
       name_counts = Hash.new(0)
@@ -345,7 +344,7 @@ module MailWorkflows
 
         path = File.join(out_dir, name)
         File.binwrite(path, att.decoded)
-        @logger.debug "  extracted #{name} (#{File.size(path)} bytes)"
+        @logger.info "  extracted #{name} (#{File.size(path)} bytes)"
         filenames << name
       end
       filenames
