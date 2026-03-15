@@ -70,6 +70,7 @@ module MailWorkflows
     end
 
     FORWARDED_MARKER_RE = /\A-{3,}\s*(?:Forwarded message|Original message)\s*-{3,}\z/
+    MARKITDOWN = "markitdown"
 
     private
 
@@ -375,8 +376,6 @@ module MailWorkflows
       base = File.basename(name, ext)
       "#{base}-#{count}#{ext}"
     end
-
-    MARKITDOWN = "markitdown"
 
     def convert_pdfs_to_markdown(stem, filenames)
       pdfs = filenames.select { |f| f.end_with?(".pdf") }

@@ -492,8 +492,8 @@ class NormalizerTest < Minitest::Test
     stem = File.basename(result.path, ".md")
     att_dir = File.join(@tmpdir, "attachments", stem)
 
-    refute File.exist?(File.join(att_dir, "image.png.md")),
-           "should not create .md for non-PDF attachments"
+    refute_path_exists File.join(att_dir, "image.png.md"),
+                       "should not create .md for non-PDF attachments"
   end
 
   def test_handles_markitdown_failure_gracefully
@@ -707,7 +707,7 @@ class NormalizerTest < Minitest::Test
   end
 
   def with_path_prepend(dir)
-    old_path = ENV["PATH"]
+    old_path = ENV.fetch("PATH", nil)
     ENV["PATH"] = "#{dir}:#{old_path}"
     yield
   ensure
