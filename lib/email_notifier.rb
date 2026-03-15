@@ -25,7 +25,7 @@ module MailWorkflows
         #{handler_output["body"]}
       BODY
 
-      mailer.send(to: to, subject: subject, body: body)
+      mailer.deliver(to: to, subject: subject, body: body)
       @logger.info "email notification sent to #{to}"
     end
 
