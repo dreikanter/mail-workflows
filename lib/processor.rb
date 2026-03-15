@@ -102,12 +102,18 @@ module MailWorkflows
 
     def parse_normalized(md_path)
       content = File.read(md_path)
-      # Split YAML frontmatter from body
-      match = content.match(/\A---\n(.*?)^---\n(.*)\z/m)
-      raise "invalid normalized email format: #{md_path}" unless match
+      # Split on the closing frontmatter delimiter. The opening "---\n" is
+      # at position 0; find the next "\n---\n" to avoid matching "---" that
+      # may appear inside the email body (e.g. markdown horizontal rules).
+      raise "invalid normalized email format: #{md_path}" unless content.start_with?("---\n")
 
-      frontmatter = YAML.safe_load(match[1]) || {}
-      body = match[2].strip
+      close = content.index("\n---\n", 4)
+      raise "invalid normalized email format: #{md_path}" unless close
+
+      frontmatter_str = content[4..close]
+      body = content[(close + 5)..].to_s.strip
+
+      frontmatter = YAML.safe_load(frontmatter_str) || {}
       [frontmatter, body]
     end
 

@@ -228,6 +228,29 @@ class ProcessorTest < Minitest::Test
     refute File.exist?("#{md_path}.retries")
   end
 
+  # --- Frontmatter parsing ---
+
+  def test_body_with_markdown_horizontal_rule_does_not_corrupt_parsing
+    write_rule("01-test.yml",
+      name: "test-rule",
+      match: { "from" => "bank.com" },
+      handler: { "type" => "script", "command" => write_echo_input_script })
+
+    write_email("personal", "20260301-080000_hr.md",
+      from: "noreply@bank.com", subject: "Report",
+      body: "Before separator\n\n---\n\nAfter separator")
+
+    processor = MailWorkflows::Processor.new(@tmpdir)
+    counts = processor.run
+
+    assert_equal 1, counts[:matched]
+    state_files = Dir.glob(File.join(@tmpdir, "state/test-rule/*.json"))
+    output = JSON.parse(File.read(state_files.first))
+    body = output["data"]["input"]["email"]["body"]
+    assert_includes body, "Before separator"
+    assert_includes body, "After separator"
+  end
+
   private
 
   def write_email(account, filename, from:, subject:, body:, to: "user@example.com", extra_frontmatter: {})
