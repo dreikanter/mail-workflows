@@ -11,9 +11,13 @@ module MailWorkflows
   # Converts raw .eml files into LLM-ready markdown with YAML frontmatter
   # and extracts attachments to a separate directory.
   class Normalizer
-    def initialize(home, logger: NULL_LOGGER)
+    attr_reader :home, :logger, :mail_reader
+    private :home, :logger, :mail_reader
+
+    def initialize(home, logger: NULL_LOGGER, mail_reader: Mail)
       @home = home
       @logger = logger
+      @mail_reader = mail_reader
     end
 
     Result = Struct.new(:path, :from, :message_id, :attachments, keyword_init: true)
@@ -21,12 +25,12 @@ module MailWorkflows
     # Normalize a single .eml file.
     # Returns a Result on success, nil if skipped (already normalized).
     def normalize(eml_path, account:, folder:)
-      @logger.info "reading #{File.basename(eml_path)}"
-      msg = Mail.read(eml_path)
+      logger.info "reading #{File.basename(eml_path)}"
+      msg = mail_reader.read(eml_path)
       message_id = msg.message_id || Digest::SHA256.hexdigest(msg.raw_source)
 
       if already_normalized?(account, message_id)
-        @logger.info "skip: already normalized message_id=#{message_id}"
+        logger.info "skip: already normalized message_id=#{message_id}"
         return nil
       end
 
@@ -37,10 +41,10 @@ module MailWorkflows
         fwd[:forwarded_by] = format_address(msg[:from])
         fwd[:forwarded_date] = extract_date(msg)
         body = fwd[:body]
-        @logger.info "forwarded message detected (inline marker), original from: #{fwd[:from]}"
+        logger.info "forwarded message detected (inline marker), original from: #{fwd[:from]}"
       else
         fwd = detect_header_forwarding(msg)
-        @logger.info "forwarded message detected (X-Forwarded-For: #{fwd[:forwarded_by]})" if fwd
+        logger.info "forwarded message detected (X-Forwarded-For: #{fwd[:forwarded_by]})" if fwd
       end
 
       stem = build_stem(msg, account, fwd: fwd)
@@ -53,8 +57,8 @@ module MailWorkflows
       seen_message_ids(account) << message_id
 
       att_info = filenames.empty? ? "" : " attachments=#{filenames.join(", ")}"
-      @logger.info "normalized: #{File.basename(md_path)} from=#{format_address(msg[:from])}#{att_info}"
-      @logger.info "  message-id: #{message_id}"
+      logger.info "normalized: #{File.basename(md_path)} from=#{format_address(msg[:from])}#{att_info}"
+      logger.info "  message-id: #{message_id}"
 
       Result.new(
         path: md_path,
@@ -67,11 +71,11 @@ module MailWorkflows
     private
 
     def normalized_dir(account)
-      File.join(@home, "normalized", account)
+      File.join(home, "normalized", account)
     end
 
     def attachments_dir
-      File.join(@home, "attachments")
+      File.join(home, "attachments")
     end
 
     def already_normalized?(account, message_id)
@@ -110,7 +114,7 @@ module MailWorkflows
       if collision?(out_dir, base_stem, account)
         mid = msg.message_id || Digest::SHA256.hexdigest(msg.raw_source)
         suffix = Digest::SHA256.hexdigest(mid)[0, 8]
-        @logger.info "stem collision for #{base_stem}, adding suffix #{suffix}"
+        logger.info "stem collision for #{base_stem}, adding suffix #{suffix}"
         "#{base_stem}_#{suffix}"
       else
         base_stem
@@ -141,7 +145,7 @@ module MailWorkflows
 
       md_path = File.join(out_dir, "#{stem}.md")
       File.write(md_path, "#{frontmatter}\n#{body}\n")
-      @logger.info "wrote #{md_path} (#{File.size(md_path)} bytes)"
+      logger.info "wrote #{md_path} (#{File.size(md_path)} bytes)"
       md_path
     end
 
@@ -184,28 +188,28 @@ module MailWorkflows
         # Prefer text/plain
         plain = msg.text_part
         if plain
-          @logger.info "body: using text/plain part"
+          logger.info "body: using text/plain part"
           return plain.decoded
         end
 
         # Fall back to text/html -> markdown
         html = msg.html_part
         if html
-          @logger.info "body: converting text/html to markdown"
+          logger.info "body: converting text/html to markdown"
           return html_to_markdown(html.decoded)
         end
 
         # Scan parts, recursing into nested multipart containers
         find_text_in_parts(msg.parts)
       elsif msg.content_type&.start_with?("text/html")
-        @logger.info "body: converting single-part text/html"
+        logger.info "body: converting single-part text/html"
         html_to_markdown(msg.decoded)
       else
-        @logger.info "body: using single-part text/plain"
+        logger.info "body: using single-part text/plain"
         msg.decoded
       end
     rescue Mail::UnknownEncodingType, Encoding::UndefinedConversionError => e
-      @logger.warn "body: encoding error (#{e.class}), falling back to raw body"
+      logger.warn "body: encoding error (#{e.class}), falling back to raw body"
       msg.body.to_s
     end
 
@@ -215,14 +219,14 @@ module MailWorkflows
           result = find_text_in_parts(part.parts)
           return result if result
         elsif part.content_type&.start_with?("text/plain")
-          @logger.info "body: using text/plain from parts scan"
+          logger.info "body: using text/plain from parts scan"
           return part.decoded
         elsif part.content_type&.start_with?("text/html")
-          @logger.info "body: converting text/html from parts scan"
+          logger.info "body: converting text/html from parts scan"
           return html_to_markdown(part.decoded)
         end
       end
-      @logger.info "body: no usable text part found"
+      logger.info "body: no usable text part found"
       nil
     end
 
@@ -295,7 +299,7 @@ module MailWorkflows
         .strip
       Time.parse(cleaned)
     rescue ArgumentError
-      @logger.warn "could not parse forwarded date: #{date_str.inspect}"
+      logger.warn "could not parse forwarded date: #{date_str.inspect}"
       nil
     end
 
@@ -348,7 +352,7 @@ module MailWorkflows
 
       out_dir = File.join(attachments_dir, stem)
       FileUtils.mkdir_p(out_dir)
-      @logger.info "extracting #{attachments.size} attachment(s) to #{out_dir}"
+      logger.info "extracting #{attachments.size} attachment(s) to #{out_dir}"
 
       filenames = []
       name_counts = Hash.new(0)
@@ -359,7 +363,7 @@ module MailWorkflows
 
         path = File.join(out_dir, name)
         File.binwrite(path, att.decoded)
-        @logger.info "  extracted #{name} (#{File.size(path)} bytes)"
+        logger.info "  extracted #{name} (#{File.size(path)} bytes)"
         filenames << name
       end
       filenames
