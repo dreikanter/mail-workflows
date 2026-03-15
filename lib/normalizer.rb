@@ -231,7 +231,7 @@ module MailWorkflows
     end
 
     def force_utf8(text)
-      text.encode("UTF-8", invalid: :replace, undef: :replace, replace: "")
+      text.encode("UTF-8", invalid: :replace, undef: :replace, replace: "\uFFFD")
     end
 
     def strip_signature(text)
