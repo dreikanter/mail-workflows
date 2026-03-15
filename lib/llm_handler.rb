@@ -91,13 +91,19 @@ module MailWorkflows
     end
 
     def parse_handler_json(text)
-      # Extract JSON from text (model may include markdown fences)
-      json_str = text.match(/\{[\s\S]*\}/)&.to_s
-      raise "no JSON found in handler output" unless json_str
+      # Extract JSON from text (model may include markdown fences).
+      # Try non-greedy first, fall back to greedy if parse fails.
+      [/\{[\s\S]*?\}/, /\{[\s\S]*\}/].each do |pattern|
+        json_str = text.match(pattern)&.to_s
+        next unless json_str
 
-      parsed = JSON.parse(json_str)
-      validate_output(parsed)
-      parsed
+        parsed = JSON.parse(json_str)
+        validate_output(parsed)
+        return parsed
+      rescue JSON::ParserError
+        next
+      end
+      raise "no JSON found in handler output"
     end
 
     def validate_output(output)
