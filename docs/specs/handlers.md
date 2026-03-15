@@ -64,7 +64,7 @@ per rule.
 
 After normalization, if an email has PDF attachments, each PDF is converted
 to Markdown using [MarkItDown](https://github.com/microsoft/markitdown)
-(`pip install 'markitdown[pdf]'`). The converted text is stored alongside
+(`pipx install 'markitdown[pdf]'`). The converted text is stored alongside
 the attachment and included in the handler input as `preprocessed` content.
 
 Future preprocessing steps (OCR, other document types) follow the same
@@ -288,7 +288,7 @@ mail-workflows/                  # tool repo
 
 | Dependency | Purpose | Install |
 |-----------|---------|---------|
-| MarkItDown | PDF → Markdown | `pip install 'markitdown[pdf]'` |
+| MarkItDown | PDF → Markdown | `pipx install 'markitdown[pdf]'` |
 | Claude Code | `type: llm` handlers | `npm install -g @anthropic-ai/claude-code` |
 
 ## Open Questions

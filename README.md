@@ -6,17 +6,20 @@ Automatically process incoming emails — extract data, match against processing
 
 - **Ruby** (3.0+)
 - **mbsync** (part of [isync](https://isync.sourceforge.io/)) — syncs IMAP mail to local Maildir
+- **MarkItDown** ([microsoft/markitdown](https://github.com/microsoft/markitdown)) — converts PDF attachments to Markdown for LLM processing
 
 Install on macOS:
 
 ```bash
-brew install isync
+brew install isync pipx
+pipx install 'markitdown[pdf]'
 ```
 
 Install on Linux (Debian/Ubuntu):
 
 ```bash
-sudo apt install isync
+sudo apt install isync pipx
+pipx install 'markitdown[pdf]'
 ```
 
 ## Quick Start
