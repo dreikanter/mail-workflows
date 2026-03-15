@@ -49,6 +49,7 @@ module MailWorkflows
 
       stem = build_stem(msg, account, fwd: fwd)
       filenames = extract_attachments(msg, stem)
+      convert_pdfs_to_markdown(stem, filenames)
       md_path = write_markdown(
         msg, stem, account, folder, message_id, filenames,
         body: body, fwd: fwd
@@ -373,6 +374,25 @@ module MailWorkflows
       ext = File.extname(name)
       base = File.basename(name, ext)
       "#{base}-#{count}#{ext}"
+    end
+
+    MARKITDOWN = "markitdown"
+
+    def convert_pdfs_to_markdown(stem, filenames)
+      pdfs = filenames.select { |f| f.end_with?(".pdf") }
+      return if pdfs.empty?
+
+      out_dir = File.join(attachments_dir, stem)
+      pdfs.each do |pdf_name|
+        pdf_path = File.join(out_dir, pdf_name)
+        md_path = "#{pdf_path}.md"
+        success = system(MARKITDOWN, pdf_path, "-o", md_path)
+        if success
+          logger.info "  converted #{pdf_name} to markdown (#{File.size(md_path)} bytes)"
+        else
+          logger.warn "  markitdown failed for #{pdf_name} (exit #{$CHILD_STATUS&.exitstatus})"
+        end
+      end
     end
   end
 end
