@@ -193,7 +193,7 @@ rm -f ~/.mail-workflows/prompts/_test-summarize.md
 rm -rf ~/.mail-workflows/state/_test-llm
 ```
 
-### Scenario 4: Handler failure and retry tracking
+### Scenario 4: Handler failure moves to failed
 
 **Setup:** Create a rule with a failing script.
 
@@ -219,31 +219,10 @@ EOF
 **Run processor.**
 
 **Expect:**
-- Log shows `handler failed` and `processor error`
-- Email stays in `new/` (not moved)
-- `.retries` file created next to the email: `<email>.md.retries` containing `1`
-- `counts[:errors]` is 1
-
-**Verify:**
-```bash
-cat ~/.mail-workflows/normalized/personal/new/20260303-*.md.retries
-```
-
-**Run processor again** (two more times, or manually set retries to 3).
-
-**Expect after 3 retries:**
-```bash
-# Shortcut: set retries to max
-echo "3" > ~/.mail-workflows/normalized/personal/new/20260303-*.md.retries
-```
-
-Run processor one more time.
-
-**Expect:**
-- Email moved to `failed/` directory
-- `.retries` file cleaned up
+- Log shows `handler failed for ...`
+- Email moved to `failed/` directory immediately (no retries)
 - `counts[:failed]` is 1
-- Log shows `max retries reached, moving to failed`
+- Non-matching emails still move to `processed/`
 
 **Verify:**
 ```bash
@@ -254,10 +233,8 @@ ls ~/.mail-workflows/normalized/personal/failed/
 ```bash
 mv ~/.mail-workflows/normalized/personal/failed/20260303-*.md \
    ~/.mail-workflows/normalized/personal/new/
-# Move non-matching emails back too
 mv ~/.mail-workflows/normalized/personal/processed/20260306-*.md \
    ~/.mail-workflows/normalized/personal/new/
-rm -f ~/.mail-workflows/normalized/personal/new/*.retries
 rm -f ~/.mail-workflows/rules/01-test-fail.yml
 rm -rf ~/.mail-workflows/state/_test-fail
 ```
@@ -421,7 +398,6 @@ rm -f ~/.mail-workflows/handlers/_test-*.sh
 rm -f ~/.mail-workflows/prompts/_test-*.md
 rm -f ~/.mail-workflows/rules/*test*.yml
 rm -rf ~/.mail-workflows/state/_test-*
-rm -f ~/.mail-workflows/normalized/personal/new/*.retries
 
 # Remove failed/ dir if created
 rm -rf ~/.mail-workflows/normalized/personal/failed/

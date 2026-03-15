@@ -9,8 +9,6 @@ module MailWorkflows
   # Processes normalized emails against rules: matches, runs handlers,
   # saves output, sends notifications, and manages file lifecycle.
   class Processor
-    MAX_RETRIES = 3
-
     def initialize(home, logger: NULL_LOGGER)
       @home = home
       @logger = logger
@@ -66,31 +64,21 @@ module MailWorkflows
         return
       end
 
-      retries = read_retries(md_path)
-      if retries >= MAX_RETRIES
-        move_to_failed(md_path, account)
-        cleanup_retries(md_path)
-        counts[:failed] += 1
-        @logger.warn "max retries reached, moving to failed: #{File.basename(md_path)}"
-        return
-      end
-
       input = build_handler_input(frontmatter, body, rule, md_path)
 
       begin
         output = Handler.execute(rule, input, home: @home, logger: @logger)
       rescue StandardError => e
-        increment_retries(md_path, retries)
+        move_to_failed(md_path, account)
+        counts[:failed] += 1
         @logger.error "handler failed for #{File.basename(md_path)}: #{e.message}"
         @logger.error e.backtrace&.first(5)&.join("\n")
-        counts[:errors] += 1
         return
       end
 
       save_output(rule, frontmatter, output)
       send_notifications(rule, output, frontmatter)
       move_to_processed(md_path, account)
-      cleanup_retries(md_path)
       counts[:matched] += 1
       @logger.info "handled: #{File.basename(md_path)} → #{rule.name}"
     end
@@ -195,26 +183,5 @@ module MailWorkflows
       File.rename(md_path, dest)
     end
 
-    # --- Retry tracking ---
-
-    def retries_path(md_path)
-      "#{md_path}.retries"
-    end
-
-    def read_retries(md_path)
-      path = retries_path(md_path)
-      return 0 unless File.exist?(path)
-
-      File.read(path).strip.to_i
-    end
-
-    def increment_retries(md_path, current)
-      File.write(retries_path(md_path), (current + 1).to_s)
-    end
-
-    def cleanup_retries(md_path)
-      path = retries_path(md_path)
-      File.delete(path) if File.exist?(path)
-    end
   end
 end

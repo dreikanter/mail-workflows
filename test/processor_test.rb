@@ -103,9 +103,9 @@ class ProcessorTest < Minitest::Test
     assert_empty Dir.glob(File.join(@tmpdir, "normalized/*/new/*.md"))
   end
 
-  # --- Retry tracking ---
+  # --- Handler failure ---
 
-  def test_handler_failure_increments_retries
+  def test_handler_failure_moves_to_failed
     write_rule("01-test.yml",
       name: "test-rule",
       match: { "from" => "bank.com" },
@@ -113,31 +113,6 @@ class ProcessorTest < Minitest::Test
 
     md_path = write_email("personal", "20260301-080000_fail.md",
       from: "noreply@bank.com", subject: "Fail", body: "Body")
-
-    processor = MailWorkflows::Processor.new(@tmpdir)
-    counts = processor.run
-
-    # Email should stay in new/
-    assert File.exist?(md_path)
-    retries_file = "#{md_path}.retries"
-    assert File.exist?(retries_file)
-    assert_equal "1", File.read(retries_file).strip
-    # Handler failure counts as error, not double-counted
-    assert_equal 1, counts[:errors]
-    assert_equal 0, counts[:matched]
-  end
-
-  def test_max_retries_moves_to_failed
-    write_rule("01-test.yml",
-      name: "test-rule",
-      match: { "from" => "bank.com" },
-      handler: { "type" => "script", "command" => write_failing_script })
-
-    md_path = write_email("personal", "20260301-080000_fail.md",
-      from: "noreply@bank.com", subject: "Fail", body: "Body")
-
-    # Pre-set retries to max
-    File.write("#{md_path}.retries", "3")
 
     processor = MailWorkflows::Processor.new(@tmpdir)
     counts = processor.run
@@ -145,8 +120,6 @@ class ProcessorTest < Minitest::Test
     assert_equal 1, counts[:failed]
     refute File.exist?(md_path)
     assert_equal 1, Dir.glob(File.join(@tmpdir, "normalized/personal/failed/*.md")).size
-    # Retries file should be cleaned up
-    refute File.exist?("#{md_path}.retries")
   end
 
   # --- Preprocessed content ---
@@ -202,26 +175,6 @@ class ProcessorTest < Minitest::Test
     assert_equal "Body text", input["email"]["body"]
     assert_equal({ "model" => "haiku" }, input["config"])
     assert input["state_dir"].end_with?("state/test-rule")
-  end
-
-  # --- Cleanup retries on success ---
-
-  def test_cleans_up_retries_file_on_success
-    write_rule("01-test.yml",
-      name: "test-rule",
-      match: { "from" => "bank.com" },
-      handler: { "type" => "script", "command" => write_handler_script })
-
-    md_path = write_email("personal", "20260301-080000_retry.md",
-      from: "noreply@bank.com", subject: "Retry", body: "Body")
-
-    # Pre-existing retries file from previous failures
-    File.write("#{md_path}.retries", "2")
-
-    processor = MailWorkflows::Processor.new(@tmpdir)
-    processor.run
-
-    refute File.exist?("#{md_path}.retries")
   end
 
   # --- Notification failure resilience ---
