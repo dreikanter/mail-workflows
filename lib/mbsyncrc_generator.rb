@@ -12,6 +12,10 @@ module MailWorkflows
 
     def run
       config_path = File.join(@home, "accounts.yml")
+      unless File.exist?(config_path)
+        raise "accounts.yml not found at #{config_path}. Run 'mw init' first."
+      end
+
       @logger.info "loading accounts from #{config_path}"
       config = YAML.safe_load_file(config_path, permitted_classes: [Symbol])
       accounts = config.fetch("accounts", {})
