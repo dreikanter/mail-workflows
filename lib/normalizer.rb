@@ -68,6 +68,8 @@ module MailWorkflows
       )
     end
 
+    FORWARDED_MARKER_RE = /\A-{3,}\s*(?:Forwarded message|Original message)\s*-{3,}\z/
+
     private
 
     def normalized_dir(account)
@@ -242,8 +244,6 @@ module MailWorkflows
       # Strip common email signature delimiter
       text.sub(/\n-- \n.*\z/m, "")
     end
-
-    FORWARDED_MARKER_RE = /\A-{3,}\s*(?:Forwarded message|Original message)\s*-{3,}\z/ # rubocop:disable Lint/UselessConstantScoping
 
     def parse_forwarded_header(text)
       lines = text.split("\n")
