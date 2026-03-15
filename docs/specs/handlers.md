@@ -48,7 +48,7 @@ match:
 
 handler:
   type: llm
-  model: claude-haiku-4-5-20251001
+  model: haiku
   prompt: bank-statement
 
 notify:
@@ -61,7 +61,8 @@ notify:
 
 ### Input
 
-Handlers receive a JSON document on stdin:
+Script handlers receive a JSON document on stdin (LLM handlers receive
+context via the assembled prompt instead):
 
 ```json
 {
@@ -81,7 +82,7 @@ Handlers receive a JSON document on stdin:
   },
   "state_dir": "/home/user/.mail-workflows/state/bank-statements",
   "config": {
-    "model": "claude-haiku-4-5-20251001"
+    "model": "haiku"
   }
 }
 ```
@@ -130,38 +131,39 @@ for most use cases — summarization, extraction, classification, analysis.
 ```yaml
 handler:
   type: llm
-  model: claude-haiku-4-5-20251001    # optional, defaults to project default
-  prompt: bank-statement               # references prompts/<name>.md
-  tools:                               # optional, restricts available tools
-    - Read
-    - Grep
-    - Bash
+  model: haiku           # optional, defaults to project default
+  prompt: bank-statement # references prompts/<name>.md
 ```
 
 The prompt template is a Markdown file in `$MAIL_WORKFLOWS_HOME/prompts/`
-with placeholders:
+with `{{placeholder}}` substitution:
 
 - `{{EMAIL_CONTENT}}` — the normalized email body
 - `{{PREPROCESSED}}` — concatenated preprocessed attachment text
-- `{{STATE_DIR}}` — path to the handler's state directory
 
-Implementation runs:
+The core tool assembles the prompt, then runs:
 
 ```bash
-claude -p --model <model> [--tools "<tools>"] --output-format json "prompt"
+cd "$STATE_DIR" && claude -p \
+  --model <model> \
+  --allowedTools "Read,Write" \
+  --add-dir "$ATTACHMENT_DIR" \
+  --output-format json \
+  "assembled prompt"
 ```
 
-The assembled prompt (template + email content + preprocessed text) is passed
-as the prompt argument. The prompt should instruct the model to produce the
-standard output JSON format.
+The agent runs with its working directory set to the handler's state
+directory and can read/write files there for persistence (e.g., saving
+last month's data for comparison). Access to the attachment directory
+is granted read-only via `--add-dir`. The `--allowedTools` restriction
+prevents shell access and limits the agent to file operations.
 
-For simple single-turn tasks, `tools` can be omitted or set to an empty list
-to disable tool use. For tasks requiring file access or multi-step reasoning,
-include the relevant tools.
+The prompt should instruct the model to produce the standard output JSON
+format. It can also instruct the model to read/write state files as needed.
 
 **Extensibility:** the `command` field can be added later to swap `claude`
-for a different agent CLI (e.g., `aider`, `goose`, a custom wrapper). Any
-CLI that reads a prompt and writes output to stdout works.
+for a different agent CLI (e.g., `aider`, `goose`). Any CLI that reads a
+prompt and writes output to stdout works.
 
 ### `type: script` — Arbitrary Executable
 
@@ -275,17 +277,13 @@ mail-workflows/                  # tool repo
 |-----------|---------|---------|
 | Claude Code | `type: llm` handlers | `npm install -g @anthropic-ai/claude-code` |
 
-## Open Questions
+## Design Decisions
 
-- **Default model:** project-wide default model setting in `accounts.yml`
-  (or a separate `config.yml`)?
-- **Prompt template format:** is `{{placeholder}}` sufficient, or do we
-  need conditional sections / loops?
-- **Batch processing:** should handlers receive one email at a time, or
-  optionally a batch (e.g., "here are 5 new bank statements")?
-- **Notification formatting:** should the handler or the notifier own
-  message formatting (Telegram Markdown, HTML email, etc.)?
-- **Claude Code system prompt:** `--system-prompt` can replace the built-in
-  prompt, but stripping it removes tool use capabilities. Worth testing
-  whether `--tools ""` alone is sufficient to reduce token overhead for
-  simple single-turn tasks.
+- **Default model** is configured in `accounts.yml`. One `--path` = one
+  configuration.
+- **Prompt templates** use simple `{{placeholder}}` substitution.
+- **Handlers process one email at a time** (no batching).
+- **Notification formatting** is owned by the handler — notifiers send
+  the handler's output as-is.
+- **Claude Code system prompt** is kept as-is (default). Tool access is
+  controlled via `--allowedTools`.
