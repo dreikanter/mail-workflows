@@ -3,7 +3,6 @@
 require_relative "test_helper"
 require "mail"
 require "securerandom"
-require_relative "../lib/normalizer"
 
 class NormalizerTest < Minitest::Test
   def setup

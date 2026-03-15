@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "test_helper"
-require_relative "../lib/slug"
 
 class SlugTest < Minitest::Test
   def test_simple_subject

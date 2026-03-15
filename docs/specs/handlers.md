@@ -110,8 +110,7 @@ Handlers write a JSON document to stdout:
 - **`body`** — detailed content (for email notifications, saved output)
 - **`data`** — arbitrary structured data for handler-specific use
 
-**Exit code:** 0 = success, non-zero = failure (email stays in `new/` for
-retry on next run).
+**Exit code:** 0 = success, non-zero = failure (email moves to `failed/`).
 
 ### Output Persistence
 
@@ -172,7 +171,7 @@ For automations unrelated to LLM, or for full custom control.
 ```yaml
 handler:
   type: script
-  command: handlers/track-payment      # relative to tool repo, or absolute
+  command: handlers/track-payment      # relative to $MAIL_WORKFLOWS_HOME, or absolute
 ```
 
 The script receives the full handler input JSON on stdin and writes handler
@@ -236,17 +235,12 @@ for each .md in normalized/<account>/new/:
   3. If no match → move to processed/
   4. Build handler input JSON (includes preprocessed PDF content from attachments/)
   5. Execute handler (llm / script)
-  6. On failure (non-zero exit):
-       increment retry count, skip
-       after 3 failures → move to failed/
+  6. On failure (non-zero exit): move to failed/
   7. On success:
        save output to state/<rule>/
        run each notifier
        move .md to processed/
 ```
-
-Retry tracking: a sidecar file `<message>.retries` next to the `.md`,
-containing the failure count as a plain integer.
 
 ## Directory Layout (additions to user data)
 

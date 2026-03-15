@@ -2,8 +2,6 @@
 
 require "mail"
 require "yaml"
-require_relative "log"
-
 module MailWorkflows
   # Sends email via SMTP using credentials from accounts.yml.
   # Reads SMTP settings from the notifications.email section.
