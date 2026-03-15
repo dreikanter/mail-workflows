@@ -93,12 +93,9 @@ module MailWorkflows
 
     def parse_handler_json(text)
       # Extract JSON from text (model may include markdown fences).
-      # Try non-greedy first, fall back to greedy if parse fails.
-      [/\{[\s\S]*?\}/, /\{[\s\S]*\}/].each do |pattern|
-        json_str = text.match(pattern)&.to_s
-        next unless json_str
-
-        parsed = JSON.parse(json_str)
+      # Scan for balanced-brace candidates and try parsing each.
+      text.scan(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/).each do |candidate|
+        parsed = JSON.parse(candidate)
         validate_output(parsed)
         return parsed
       rescue JSON::ParserError
