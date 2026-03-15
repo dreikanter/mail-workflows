@@ -1,0 +1,55 @@
+#!/bin/bash
+# frozen_string_literal: true
+
+# Manages the cron entry for bin/run.
+#
+# Usage:
+#   bin/schedule on       Install cron entry (every 5 minutes)
+#   bin/schedule off      Remove cron entry
+#   bin/schedule status   Show whether the schedule is active
+
+set -euo pipefail
+
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+RUN_CMD="$BIN_DIR/run"
+MARKER="# mail-workflows"
+CRON_ENTRY="*/5 * * * * $RUN_CMD >> ~/.mail-workflows/log/cron.log 2>&1 $MARKER"
+
+current_crontab() {
+  crontab -l 2>/dev/null || true
+}
+
+has_entry() {
+  current_crontab | grep -qF "$MARKER"
+}
+
+case "${1:-}" in
+  on)
+    if has_entry; then
+      echo "Already scheduled."
+    else
+      ( current_crontab; echo "$CRON_ENTRY" ) | crontab -
+      echo "Scheduled: every 5 minutes."
+    fi
+    ;;
+  off)
+    if has_entry; then
+      { current_crontab | grep -vF "$MARKER" || true; } | crontab -
+      echo "Unscheduled."
+    else
+      echo "Not scheduled."
+    fi
+    ;;
+  status)
+    if has_entry; then
+      echo "Active:"
+      current_crontab | grep -F "$MARKER"
+    else
+      echo "Not scheduled."
+    fi
+    ;;
+  *)
+    echo "Usage: schedule {on|off|status}" >&2
+    exit 1
+    ;;
+esac

@@ -87,36 +87,11 @@ security add-generic-password -s mail-workflows-personal -a "$USER" -w "new-app-
 
 ## Scheduling
 
-On macOS, use launchd to run `bin/run` every 5 minutes. The included plist template needs two paths: the repo `bin/` directory and the data directory.
-
-### Enable
-
 ```bash
-# Copy and configure the plist
-PLIST=~/Library/LaunchAgents/com.mail-workflows.run.plist
-cp defaults/com.mail-workflows.run.plist "$PLIST"
-
-# Replace placeholders with actual paths
-sed -i '' "s|MAIL_WORKFLOWS_BIN|$HOME/mail-workflows/bin|g" "$PLIST"
-sed -i '' "s|MAIL_WORKFLOWS_HOME|$HOME/.mail-workflows|g" "$PLIST"
-
-# Load the schedule
-launchctl load "$PLIST"
+bin/schedule on       # install cron entry (every 5 minutes)
+bin/schedule off      # remove it
+bin/schedule status   # check
 ```
-
-### Disable
-
-```bash
-launchctl unload ~/Library/LaunchAgents/com.mail-workflows.run.plist
-```
-
-### Check status
-
-```bash
-launchctl list | grep mail-workflows
-```
-
-To run manually at any time: `bin/run`
 
 ## Development
 
