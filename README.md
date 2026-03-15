@@ -110,4 +110,4 @@ Run tests:
 bundle exec rake
 ```
 
-See [SPEC.md](SPEC.md) for details.
+See [docs/specs/](docs/specs/) for architecture and design specs.
