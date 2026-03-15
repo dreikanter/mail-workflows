@@ -42,6 +42,10 @@ module MailWorkflows
       end
     end
 
+    def level
+      @loggers.first&.level
+    end
+
     def level=(val)
       @loggers.each { |l| l.level = val }
     end
