@@ -190,6 +190,8 @@ module MailWorkflows
     # --- Sync (extracted from former bin/sync) ---
 
     def sync_mail(log)
+      errors = 0
+
       generator = MailWorkflows::MbsyncrcGenerator.new(@home, logger: log)
       rc_path = generator.run
 
@@ -197,14 +199,18 @@ module MailWorkflows
         log.info "no accounts configured, skipping sync"
       else
         log.info "syncing mail"
-        system("mbsync", "-c", rc_path, "-a", exception: true)
+        begin
+          system("mbsync", "-c", rc_path, "-a", exception: true)
+        rescue RuntimeError => e
+          errors += 1
+          log.error "mbsync failed: #{e.message}"
+        end
       end
 
       store = MailWorkflows::MaildirStore.new(@home)
       normalizer = MailWorkflows::Normalizer.new(@home, logger: log)
 
       count = 0
-      errors = 0
 
       store.each_new_message do |filepath, maildir, account, folder|
         result = normalizer.normalize(filepath, account: account, folder: folder)
@@ -219,7 +225,8 @@ module MailWorkflows
       log.info "done: #{count} normalized, #{errors} errors"
 
       processor = MailWorkflows::Processor.new(@home, logger: log)
-      processor.run
+      proc_counts = processor.run
+      errors += proc_counts[:failed] + proc_counts[:errors]
 
       errors
     end
