@@ -189,10 +189,15 @@ module MailWorkflows
     # --- Sync (extracted from former bin/sync) ---
 
     def sync_mail(log)
-      MailWorkflows::MbsyncrcGenerator.new(@home, logger: log).run
+      generator = MailWorkflows::MbsyncrcGenerator.new(@home, logger: log)
+      rc_path = generator.run
 
-      log.info "syncing mail"
-      system("mbsync", "-c", File.join(@home, ".mbsyncrc"), "-a", exception: true)
+      if File.empty?(rc_path)
+        log.info "no accounts configured, skipping sync"
+      else
+        log.info "syncing mail"
+        system("mbsync", "-c", rc_path, "-a", exception: true)
+      end
 
       store = MailWorkflows::MaildirStore.new(@home)
       normalizer = MailWorkflows::Normalizer.new(@home, logger: log)
