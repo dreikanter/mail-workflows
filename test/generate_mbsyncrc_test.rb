@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 require_relative "test_helper"
+require_relative "../lib/mbsyncrc_generator"
 
-class GenerateMbsyncrcTest < Minitest::Test
+class MbsyncrcGeneratorTest < Minitest::Test
   def setup
     @tmpdir = Dir.mktmpdir("mbsyncrc-test")
-    @script = File.expand_path("../bin/generate-mbsyncrc", __dir__)
   end
 
   def teardown
@@ -150,8 +150,7 @@ class GenerateMbsyncrcTest < Minitest::Test
   end
 
   def run_generator
-    output = `ruby #{Shellwords.shellescape(@script)} #{Shellwords.shellescape(@tmpdir)} 2>&1`
-    assert $?.success?, "generate_mbsyncrc.rb failed: #{output}"
+    MailWorkflows::MbsyncrcGenerator.new(@tmpdir).run
   end
 
   def read_mbsyncrc

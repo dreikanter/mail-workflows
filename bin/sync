@@ -1,33 +1,65 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "../lib/maildir_store"
-require_relative "../lib/normalizer"
+# Syncs mail from IMAP and normalizes new messages into LLM-ready markdown.
+#
+# Steps:
+#   1. Generate .mbsyncrc from accounts.yml and ensure Maildir directories exist
+#   2. Run mbsync to pull new mail
+#   3. Normalize new messages (extract body, attachments, write markdown)
+#
+# Usage: bin/sync [--home DIR]
 
-home = ARGV.include?("--home") ? ARGV[ARGV.index("--home") + 1] : nil
-store = MailWorkflows::MaildirStore.new(home)
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+require "mbsyncrc_generator"
+require "maildir_store"
+require "normalizer"
 
-# Generate .mbsyncrc from accounts.yml and ensure Maildir directories exist
-script_dir = File.expand_path(__dir__)
-system("ruby", File.join(script_dir, "generate-mbsyncrc"), store.home, exception: true)
+# --- Parse arguments ---
 
-# Sync all configured accounts
+home = ENV.fetch("MAIL_WORKFLOWS_HOME", File.expand_path("~/.mail-workflows"))
+
+args = ARGV.dup
+while args.any?
+  case args.shift
+  when "--home" then home = args.shift
+  else
+    $stderr.puts "Usage: sync [--home DIR]"
+    exit 1
+  end
+end
+
+# --- Step 1: Generate .mbsyncrc and prepare Maildir ---
+
+$stderr.puts "Generated #{MailWorkflows::MbsyncrcGenerator.new(home).run}"
+$stderr.puts "Maildir directories ready"
+
+# --- Step 2: Run mbsync ---
+
 $stderr.puts "Syncing mail..."
-rc_path = File.join(store.home, ".mbsyncrc")
-system("mbsync", "-c", rc_path, "-a", exception: true)
+system("mbsync", "-c", File.join(home, ".mbsyncrc"), "-a", exception: true)
 $stderr.puts "Sync complete."
 
-# Normalize new messages
-normalizer = MailWorkflows::Normalizer.new(store.home)
+# --- Step 3: Normalize new messages ---
+
+store = MailWorkflows::MaildirStore.new(home)
+normalizer = MailWorkflows::Normalizer.new(home)
+
 count = 0
 errors = 0
 
 store.each_new_message do |filepath, maildir, account, folder|
-  md_path = normalizer.normalize(filepath, account: account, folder: folder)
-  if md_path
+  result = normalizer.normalize(filepath, account: account, folder: folder)
+  if result
     maildir.mark_processed(filepath)
     count += 1
-    $stderr.puts "normalized: #{File.basename(md_path)}"
+    name = File.basename(result.path)
+    $stderr.puts "normalized: #{name}"
+    $stderr.puts "  from: #{result.from}"
+    $stderr.puts "  message-id: #{result.message_id}"
+    unless result.attachments.empty?
+      result.attachments.each { |a| $stderr.puts "  attachment: #{a}" }
+    end
   end
 rescue StandardError => e
   errors += 1
