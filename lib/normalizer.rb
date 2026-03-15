@@ -50,6 +50,8 @@ module MailWorkflows
         body: body, fwd: fwd
       )
 
+      seen_message_ids(account) << message_id
+
       att_info = filenames.empty? ? "" : " attachments=#{filenames.join(", ")}"
       @logger.info "normalized: #{File.basename(md_path)} from=#{format_address(msg[:from])}#{att_info}"
       @logger.info "  message-id: #{message_id}"
@@ -73,6 +75,15 @@ module MailWorkflows
     end
 
     def already_normalized?(account, message_id)
+      seen_ids = seen_message_ids(account)
+      seen_ids.include?(message_id)
+    end
+
+    def seen_message_ids(account)
+      @seen_ids_cache ||= {}
+      return @seen_ids_cache[account] if @seen_ids_cache.key?(account)
+
+      ids = Set.new
       base = normalized_dir(account)
       %w[new processed].each do |subdir|
         dir = File.join(base, subdir)
@@ -80,12 +91,11 @@ module MailWorkflows
 
         Dir.glob(File.join(dir, "*.md")).each do |md_file|
           content = File.read(md_file)
-          if content.match?(/^message_id:\s.*#{Regexp.escape(message_id)}/)
-            return true
-          end
+          match = content.match(/^message_id:\s+(.+)$/)
+          ids << match[1].strip if match
         end
       end
-      false
+      @seen_ids_cache[account] = ids
     end
 
     def build_stem(msg, account, fwd: nil)
