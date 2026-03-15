@@ -40,9 +40,10 @@ class SlugTest < Minitest::Test
   end
 
   def test_truncates_long_subject_at_word_boundary
-    long_subject = "this is a very long subject line that should be truncated at approximately sixty characters on a word boundary"
+    long_subject = "this is a very long subject line that should be truncated at approximately " \
+                   "sixty characters on a word boundary"
     slug = MailWorkflows::Slug.slugify(long_subject)
-    assert slug.length <= 65, "slug too long: #{slug.length}"
+    assert_operator slug.length, :<=, 65, "slug too long: #{slug.length}"
     refute slug.end_with?("-"), "slug should not end with hyphen"
   end
 

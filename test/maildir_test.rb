@@ -29,7 +29,7 @@ class MaildirTest < Minitest::Test
     create_message("new", "msg2")
 
     assert_equal 2, @maildir.new_messages.size
-    assert @maildir.new_messages.all? { |f| f.include?("/new/") }
+    assert(@maildir.new_messages.all? { |f| f.include?("/new/") })
   end
 
   def test_new_messages_sorted_by_mtime
@@ -54,7 +54,7 @@ class MaildirTest < Minitest::Test
     create_message("cur", "msg1")
 
     assert_equal 1, @maildir.cur_messages.size
-    assert @maildir.cur_messages.first.include?("/cur/")
+    assert_includes @maildir.cur_messages.first, "/cur/"
   end
 
   def test_read_returns_file_content
@@ -71,8 +71,8 @@ class MaildirTest < Minitest::Test
     new_path = @maildir.mark_processed(path)
 
     assert_includes new_path, "/cur/"
-    refute File.exist?(path)
-    assert File.exist?(new_path)
+    refute_path_exists path
+    assert_path_exists new_path
     assert_equal 0, @maildir.new_messages.size
     assert_equal 1, @maildir.cur_messages.size
   end
@@ -84,8 +84,8 @@ class MaildirTest < Minitest::Test
     new_path = @maildir.mark_failed(path)
 
     assert_includes new_path, "/failed/"
-    refute File.exist?(path)
-    assert File.exist?(new_path)
+    refute_path_exists path
+    assert_path_exists new_path
   end
 
   def test_mark_failed_creates_failed_dir

@@ -28,7 +28,7 @@ class LlmHandlerTest < Minitest::Test
     handler = MailWorkflows::LlmHandler.new(@tmpdir)
     status = stub_success_status
 
-    Open3.stub(:capture3, ->(*_args, stdin_data: nil, **_kw) {
+    Open3.stub(:capture3, lambda { |*_args, stdin_data: nil, **_kw|
       captured_stdin = stdin_data
       [claude_json_response("prompt check"), "", status]
     }) do
@@ -58,7 +58,7 @@ class LlmHandlerTest < Minitest::Test
     handler = MailWorkflows::LlmHandler.new(@tmpdir)
     status = stub_success_status
 
-    Open3.stub(:capture3, ->(*_args, stdin_data: nil, **_kw) {
+    Open3.stub(:capture3, lambda { |*_args, stdin_data: nil, **_kw|
       captured_stdin = stdin_data
       [claude_json_response("preprocessed check"), "", status]
     }) do
@@ -76,9 +76,9 @@ class LlmHandlerTest < Minitest::Test
     status = stub_success_status
 
     claude_output = JSON.generate({
-      "type" => "result",
-      "result" => '{"summary": "parsed ok", "body": "detail", "data": {}}'
-    })
+                                    "type" => "result",
+                                    "result" => '{"summary": "parsed ok", "body": "detail", "data": {}}'
+                                  })
 
     Open3.stub(:capture3, [claude_output, "", status]) do
       result = handler.execute({ "prompt" => "test" }, sample_input)
@@ -151,8 +151,8 @@ class LlmHandlerTest < Minitest::Test
 
   def claude_json_response(summary)
     JSON.generate({
-      "type" => "result",
-      "result" => JSON.generate({ "summary" => summary, "body" => "", "data" => {} })
-    })
+                    "type" => "result",
+                    "result" => JSON.generate({ "summary" => summary, "body" => "", "data" => {} })
+                  })
   end
 end

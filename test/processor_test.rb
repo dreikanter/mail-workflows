@@ -18,7 +18,7 @@ class ProcessorTest < Minitest::Test
 
   def test_no_rules_moves_all_to_processed
     write_email("personal", "20260301-080000_test-email.md",
-      from: "sender@example.com", subject: "Hello", body: "Hi there")
+                from: "sender@example.com", subject: "Hello", body: "Hi there")
 
     processor = MailWorkflows::Processor.new(@tmpdir)
     counts = processor.run
@@ -33,12 +33,12 @@ class ProcessorTest < Minitest::Test
 
   def test_matching_rule_runs_handler
     write_rule("01-test.yml",
-      name: "test-rule",
-      match: { "from" => "bank.com" },
-      handler: { "type" => "script", "command" => write_handler_script })
+               name: "test-rule",
+               match: { "from" => "bank.com" },
+               handler: { "type" => "script", "command" => write_handler_script })
 
     write_email("personal", "20260301-080000_statement.md",
-      from: "noreply@bank.com", subject: "Monthly Statement", body: "Your balance is $100")
+                from: "noreply@bank.com", subject: "Monthly Statement", body: "Your balance is $100")
 
     processor = MailWorkflows::Processor.new(@tmpdir)
     counts = processor.run
@@ -50,12 +50,12 @@ class ProcessorTest < Minitest::Test
 
   def test_handler_output_saved_to_state_dir
     write_rule("01-test.yml",
-      name: "test-rule",
-      match: { "from" => "bank.com" },
-      handler: { "type" => "script", "command" => write_handler_script })
+               name: "test-rule",
+               match: { "from" => "bank.com" },
+               handler: { "type" => "script", "command" => write_handler_script })
 
     write_email("personal", "20260301-080000_statement.md",
-      from: "noreply@bank.com", subject: "Monthly Statement", body: "Balance")
+                from: "noreply@bank.com", subject: "Monthly Statement", body: "Balance")
 
     processor = MailWorkflows::Processor.new(@tmpdir)
     processor.run
@@ -71,12 +71,12 @@ class ProcessorTest < Minitest::Test
 
   def test_non_matching_email_moves_to_processed
     write_rule("01-test.yml",
-      name: "test-rule",
-      match: { "from" => "bank.com" },
-      handler: { "type" => "script", "command" => write_handler_script })
+               name: "test-rule",
+               match: { "from" => "bank.com" },
+               handler: { "type" => "script", "command" => write_handler_script })
 
     write_email("personal", "20260301-080000_random.md",
-      from: "friend@example.com", subject: "Hey", body: "What's up?")
+                from: "friend@example.com", subject: "Hey", body: "What's up?")
 
     processor = MailWorkflows::Processor.new(@tmpdir)
     counts = processor.run
@@ -92,9 +92,9 @@ class ProcessorTest < Minitest::Test
     FileUtils.mkdir_p(File.join(@tmpdir, "normalized/work/processed"))
 
     write_email("personal", "20260301-080000_email1.md",
-      from: "a@b.com", subject: "One", body: "Body 1")
+                from: "a@b.com", subject: "One", body: "Body 1")
     write_email("work", "20260301-080000_email2.md",
-      from: "c@d.com", subject: "Two", body: "Body 2")
+                from: "c@d.com", subject: "Two", body: "Body 2")
 
     processor = MailWorkflows::Processor.new(@tmpdir)
     counts = processor.run
@@ -107,18 +107,18 @@ class ProcessorTest < Minitest::Test
 
   def test_handler_failure_moves_to_failed
     write_rule("01-test.yml",
-      name: "test-rule",
-      match: { "from" => "bank.com" },
-      handler: { "type" => "script", "command" => write_failing_script })
+               name: "test-rule",
+               match: { "from" => "bank.com" },
+               handler: { "type" => "script", "command" => write_failing_script })
 
     md_path = write_email("personal", "20260301-080000_fail.md",
-      from: "noreply@bank.com", subject: "Fail", body: "Body")
+                          from: "noreply@bank.com", subject: "Fail", body: "Body")
 
     processor = MailWorkflows::Processor.new(@tmpdir)
     counts = processor.run
 
     assert_equal 1, counts[:failed]
-    refute File.exist?(md_path)
+    refute_path_exists md_path
     assert_equal 1, Dir.glob(File.join(@tmpdir, "normalized/personal/failed/*.md")).size
   end
 
@@ -126,9 +126,9 @@ class ProcessorTest < Minitest::Test
 
   def test_loads_preprocessed_pdf_content
     write_rule("01-test.yml",
-      name: "test-rule",
-      match: { "from" => "bank.com" },
-      handler: { "type" => "script", "command" => write_echo_input_script })
+               name: "test-rule",
+               match: { "from" => "bank.com" },
+               handler: { "type" => "script", "command" => write_echo_input_script })
 
     stem = "20260301-080000_statement"
     att_dir = File.join(@tmpdir, "attachments", stem)
@@ -136,7 +136,7 @@ class ProcessorTest < Minitest::Test
     File.write(File.join(att_dir, "report.pdf.md"), "Extracted PDF content")
 
     write_email("personal", "#{stem}.md",
-      from: "noreply@bank.com", subject: "Statement", body: "See attached")
+                from: "noreply@bank.com", subject: "Statement", body: "See attached")
 
     processor = MailWorkflows::Processor.new(@tmpdir)
     processor.run
@@ -152,16 +152,16 @@ class ProcessorTest < Minitest::Test
 
   def test_handler_input_contains_expected_fields
     write_rule("01-test.yml",
-      name: "test-rule",
-      match: { "from" => "bank.com" },
-      handler: { "type" => "script", "command" => write_echo_input_script, "model" => "haiku" })
+               name: "test-rule",
+               match: { "from" => "bank.com" },
+               handler: { "type" => "script", "command" => write_echo_input_script, "model" => "haiku" })
 
     write_email("personal", "20260301-080000_test.md",
-      from: "noreply@bank.com",
-      to: "user@example.com",
-      subject: "Test Email",
-      body: "Body text",
-      extra_frontmatter: { "folder" => "INBOX", "message_id" => "<test@example.com>" })
+                from: "noreply@bank.com",
+                to: "user@example.com",
+                subject: "Test Email",
+                body: "Body text",
+                extra_frontmatter: { "folder" => "INBOX", "message_id" => "<test@example.com>" })
 
     processor = MailWorkflows::Processor.new(@tmpdir)
     processor.run
@@ -181,14 +181,14 @@ class ProcessorTest < Minitest::Test
 
   def test_notification_failure_does_not_block_processing
     write_rule("01-test.yml",
-      name: "test-rule",
-      match: { "from" => "bank.com" },
-      handler: { "type" => "script", "command" => write_handler_script },
-      notify: [{ "type" => "telegram" }])
+               name: "test-rule",
+               match: { "from" => "bank.com" },
+               handler: { "type" => "script", "command" => write_handler_script },
+               notify: [{ "type" => "telegram" }])
 
     # No accounts.yml with telegram config → TelegramNotifier will raise
     write_email("personal", "20260301-080000_notify-fail.md",
-      from: "noreply@bank.com", subject: "Statement", body: "Body")
+                from: "noreply@bank.com", subject: "Statement", body: "Body")
 
     processor = MailWorkflows::Processor.new(@tmpdir)
     counts = processor.run
@@ -214,13 +214,13 @@ class ProcessorTest < Minitest::Test
 
   def test_body_with_markdown_horizontal_rule_does_not_corrupt_parsing
     write_rule("01-test.yml",
-      name: "test-rule",
-      match: { "from" => "bank.com" },
-      handler: { "type" => "script", "command" => write_echo_input_script })
+               name: "test-rule",
+               match: { "from" => "bank.com" },
+               handler: { "type" => "script", "command" => write_echo_input_script })
 
     write_email("personal", "20260301-080000_hr.md",
-      from: "noreply@bank.com", subject: "Report",
-      body: "Before separator\n\n---\n\nAfter separator")
+                from: "noreply@bank.com", subject: "Report",
+                body: "Before separator\n\n---\n\nAfter separator")
 
     processor = MailWorkflows::Processor.new(@tmpdir)
     counts = processor.run

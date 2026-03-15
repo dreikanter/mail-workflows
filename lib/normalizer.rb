@@ -20,7 +20,7 @@ module MailWorkflows
       @mail_reader = mail_reader
     end
 
-    Result = Struct.new(:path, :from, :message_id, :attachments, keyword_init: true)
+    Result = Struct.new(:path, :from, :message_id, :attachments)
 
     # Normalize a single .eml file.
     # Returns a Result on success, nil if skipped (already normalized).
@@ -243,7 +243,7 @@ module MailWorkflows
       text.sub(/\n-- \n.*\z/m, "")
     end
 
-    FORWARDED_MARKER_RE = /\A-{3,}\s*(?:Forwarded message|Original message)\s*-{3,}\z/
+    FORWARDED_MARKER_RE = /\A-{3,}\s*(?:Forwarded message|Original message)\s*-{3,}\z/ # rubocop:disable Lint/UselessConstantScoping
 
     def parse_forwarded_header(text)
       lines = text.split("\n")
@@ -253,7 +253,7 @@ module MailWorkflows
       fields = {}
       body_start = marker_idx + 1
 
-      (marker_idx + 1...lines.length).each do |i|
+      ((marker_idx + 1)...lines.length).each do |i|
         line = lines[i].strip
         if line.empty?
           if fields.any?
@@ -264,10 +264,10 @@ module MailWorkflows
         end
 
         case line
-        when /\AFrom:\s+(.*)/    then fields[:from] = $1.strip
-        when /\ADate:\s+(.*)/    then fields[:date_str] = $1.strip
-        when /\ASubject:\s+(.*)/ then fields[:subject] = $1.strip
-        when /\ATo:\s+(.*)/      then fields[:to] = $1.strip
+        when /\AFrom:\s+(.*)/    then fields[:from] = ::Regexp.last_match(1).strip
+        when /\ADate:\s+(.*)/    then fields[:date_str] = ::Regexp.last_match(1).strip
+        when /\ASubject:\s+(.*)/ then fields[:subject] = ::Regexp.last_match(1).strip
+        when /\ATo:\s+(.*)/      then fields[:to] = ::Regexp.last_match(1).strip
         else
           body_start = i
           break
@@ -293,10 +293,10 @@ module MailWorkflows
 
     def parse_forwarded_date(date_str)
       cleaned = date_str
-        .gsub(/\s+at\s+/, " ")
-        .gsub(/[\u202F\u00A0]/, " ")
-        .squeeze(" ")
-        .strip
+                .gsub(/\s+at\s+/, " ")
+                .gsub(/[\u202F\u00A0]/, " ")
+                .squeeze(" ")
+                .strip
       Time.parse(cleaned)
     rescue ArgumentError
       logger.warn "could not parse forwarded date: #{date_str.inspect}"

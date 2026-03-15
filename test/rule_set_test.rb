@@ -36,11 +36,10 @@ class RuleSetTest < Minitest::Test
 
   def test_loads_rule_fields
     write_rule("test.yml",
-      name: "test-rule",
-      match: { "from" => "sender@example.com" },
-      handler: { "type" => "script", "command" => "/bin/echo" },
-      notify: [{ "type" => "desktop" }]
-    )
+               name: "test-rule",
+               match: { "from" => "sender@example.com" },
+               handler: { "type" => "script", "command" => "/bin/echo" },
+               notify: [{ "type" => "desktop" }])
 
     rule_set = MailWorkflows::RuleSet.new(@tmpdir)
     rule = rule_set.rules.first
@@ -104,7 +103,7 @@ class RuleSetTest < Minitest::Test
   end
 
   def test_regex_no_match
-    write_rule("test.yml", name: "test", match: { "from" => '/^admin@/' })
+    write_rule("test.yml", name: "test", match: { "from" => "/^admin@/" })
     rule_set = MailWorkflows::RuleSet.new(@tmpdir)
 
     result = rule_set.match({ "from" => "user@admin.com", "subject" => "" }, "")

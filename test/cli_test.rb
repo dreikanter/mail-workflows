@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "English"
 require_relative "test_helper"
 
 class CLITest < Minitest::Test
@@ -47,7 +48,7 @@ class CLITest < Minitest::Test
     %w[rules prompts mail normalized attachments state log].each do |dir|
       assert Dir.exist?(File.join(path, dir)), "Expected #{dir}/ to exist"
     end
-    assert File.exist?(File.join(path, "accounts.yml"))
+    assert_path_exists File.join(path, "accounts.yml")
   end
 
   def test_init_uses_path_flag
@@ -55,7 +56,7 @@ class CLITest < Minitest::Test
     run_mw("--path #{Shellwords.shellescape(path)} init")
 
     assert Dir.exist?(File.join(path, "rules"))
-    assert File.exist?(File.join(path, "accounts.yml"))
+    assert_path_exists File.join(path, "accounts.yml")
   end
 
   def test_init_refuses_existing_dir
@@ -114,8 +115,8 @@ class CLITest < Minitest::Test
 
     run_mw("--path #{Shellwords.shellescape(@tmpdir)} purge --confirm")
 
-    assert File.exist?(File.join(@tmpdir, "accounts.yml"))
-    assert File.exist?(File.join(@tmpdir, "rules/test.yml"))
+    assert_path_exists File.join(@tmpdir, "accounts.yml")
+    assert_path_exists File.join(@tmpdir, "rules/test.yml")
   end
 
   def test_purge_succeeds_when_dirs_missing
@@ -140,9 +141,9 @@ class CLITest < Minitest::Test
   def run_mw(args, expect_failure: false)
     output = `ruby #{Shellwords.shellescape(@mw)} #{args} 2>&1`
     if expect_failure
-      refute $?.success?, "Expected failure but got success. Output: #{output}"
+      refute_predicate $CHILD_STATUS, :success?, "Expected failure but got success. Output: #{output}"
     else
-      assert $?.success?, "Command failed (exit #{$?.exitstatus}): #{output}"
+      assert_predicate $CHILD_STATUS, :success?, "Command failed (exit #{$CHILD_STATUS.exitstatus}): #{output}"
     end
     output
   end

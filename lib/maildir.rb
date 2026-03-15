@@ -56,8 +56,8 @@ module MailWorkflows
 
     def list(subdir)
       Dir.glob(File.join(@path, subdir, "*"))
-        .select { |f| File.file?(f) }
-        .sort_by { |f| File.mtime(f) }
+         .select { |f| File.file?(f) }
+         .sort_by { |f| File.mtime(f) }
     end
 
     def move_to(filepath, subdir)

@@ -35,7 +35,7 @@ module MailWorkflows
       yaml.dig("notifications", "telegram") || raise("missing notifications.telegram in accounts.yml")
     end
 
-    HTTP_TIMEOUT = 15
+    HTTP_TIMEOUT = 15 # rubocop:disable Lint/UselessConstantScoping
 
     def send_message(text)
       token = config.fetch("token")
@@ -56,9 +56,9 @@ module MailWorkflows
 
       response = http.request(request)
 
-      unless response.is_a?(Net::HTTPSuccess)
-        raise "telegram API error: #{response.code} #{response.body}"
-      end
+      return if response.is_a?(Net::HTTPSuccess)
+
+      raise "telegram API error: #{response.code} #{response.body}"
     end
 
     def escape_md(text)
