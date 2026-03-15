@@ -2,17 +2,22 @@
 
 require "yaml"
 require "fileutils"
+require_relative "log"
 
 module MailWorkflows
   # Generates .mbsyncrc from accounts.yml and ensures Maildir directories exist.
   class MbsyncrcGenerator
-    def initialize(home)
+    def initialize(home, logger: NULL_LOGGER)
       @home = home
+      @logger = logger
     end
 
     def run
-      config = YAML.load_file(File.join(@home, "accounts.yml"))
+      config_path = File.join(@home, "accounts.yml")
+      @logger.info "loading accounts from #{config_path}"
+      config = YAML.load_file(config_path)
       accounts = config.fetch("accounts", {})
+      @logger.info "found #{accounts.size} account(s): #{accounts.keys.join(", ")}"
 
       rc_path = generate_rc(accounts)
       create_maildirs(accounts)
@@ -31,6 +36,9 @@ module MailWorkflows
           tls_type = acct.fetch("tls", true) ? "IMAPS" : "None"
           folders = acct.fetch("folders", ["INBOX"])
           store_path = File.join(@home, "mail", name) + "/"
+
+          @logger.debug "account #{name}: #{acct["host"]}:#{acct.fetch("port", 993)} " \
+                        "tls=#{tls_type} folders=#{folders.join(",")}"
 
           f.puts "IMAPAccount #{name}"
           f.puts "Host #{acct["host"]}"
@@ -59,6 +67,7 @@ module MailWorkflows
         end
       end
 
+      @logger.info "wrote #{rc_path} (mode 0600)"
       rc_path
     end
 
@@ -67,6 +76,7 @@ module MailWorkflows
         acct.fetch("folders", ["INBOX"]).each do |folder|
           dir = File.join(@home, "mail", name, folder)
           %w[new cur tmp].each { |sub| FileUtils.mkdir_p(File.join(dir, sub)) }
+          @logger.debug "maildir ready: #{dir}"
         end
       end
     end

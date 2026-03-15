@@ -8,9 +8,10 @@
 #   2. Run mbsync to pull new mail
 #   3. Normalize new messages (extract body, attachments, write markdown)
 #
-# Usage: bin/sync [--home DIR]
+# Usage: bin/sync [--home DIR] [--verbose]
 
 $LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+require "log"
 require "mbsyncrc_generator"
 require "maildir_store"
 require "normalizer"
@@ -18,32 +19,38 @@ require "normalizer"
 # --- Parse arguments ---
 
 home = ENV.fetch("MAIL_WORKFLOWS_HOME", File.expand_path("~/.mail-workflows"))
+verbose = false
 
 args = ARGV.dup
 while args.any?
   case args.shift
   when "--home" then home = args.shift
+  when "--verbose", "-v" then verbose = true
   else
-    $stderr.puts "Usage: sync [--home DIR]"
+    $stderr.puts "Usage: sync [--home DIR] [--verbose]"
     exit 1
   end
 end
 
+level = verbose ? Logger::DEBUG : Logger::INFO
+log = MailWorkflows.create_logger(level: level)
+
 # --- Step 1: Generate .mbsyncrc and prepare Maildir ---
 
-$stderr.puts "Generated #{MailWorkflows::MbsyncrcGenerator.new(home).run}"
-$stderr.puts "Maildir directories ready"
+rc_path = MailWorkflows::MbsyncrcGenerator.new(home, logger: log).run
+log.info "generated #{rc_path}"
 
 # --- Step 2: Run mbsync ---
 
-$stderr.puts "Syncing mail..."
-system("mbsync", "-c", File.join(home, ".mbsyncrc"), "-a", exception: true)
-$stderr.puts "Sync complete."
+rc_file = File.join(home, ".mbsyncrc")
+log.info "running mbsync"
+system("mbsync", "-c", rc_file, "-a", exception: true)
+log.info "mbsync complete"
 
 # --- Step 3: Normalize new messages ---
 
 store = MailWorkflows::MaildirStore.new(home)
-normalizer = MailWorkflows::Normalizer.new(home)
+normalizer = MailWorkflows::Normalizer.new(home, logger: log)
 
 count = 0
 errors = 0
@@ -53,17 +60,11 @@ store.each_new_message do |filepath, maildir, account, folder|
   if result
     maildir.mark_processed(filepath)
     count += 1
-    name = File.basename(result.path)
-    $stderr.puts "normalized: #{name}"
-    $stderr.puts "  from: #{result.from}"
-    $stderr.puts "  message-id: #{result.message_id}"
-    unless result.attachments.empty?
-      result.attachments.each { |a| $stderr.puts "  attachment: #{a}" }
-    end
   end
 rescue StandardError => e
   errors += 1
-  $stderr.puts "WARN: failed to normalize #{File.basename(filepath)}: #{e.message}"
+  log.error "failed to normalize #{File.basename(filepath)}: #{e.message}"
+  log.debug e.backtrace.first(5).join("\n")
 end
 
-$stderr.puts "Done: #{count} normalized, #{errors} errors"
+log.info "done: #{count} normalized, #{errors} errors"

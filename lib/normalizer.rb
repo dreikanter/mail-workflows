@@ -8,13 +8,15 @@ require "cgi"
 require "fileutils"
 require "time"
 require_relative "slug"
+require_relative "log"
 
 module MailWorkflows
   # Converts raw .eml files into LLM-ready markdown with YAML frontmatter
   # and extracts attachments to a separate directory.
   class Normalizer
-    def initialize(home)
+    def initialize(home, logger: NULL_LOGGER)
       @home = home
+      @logger = logger
     end
 
     Result = Struct.new(:path, :from, :message_id, :attachments, keyword_init: true)
@@ -22,10 +24,14 @@ module MailWorkflows
     # Normalize a single .eml file.
     # Returns a Result on success, nil if skipped (already normalized).
     def normalize(eml_path, account:, folder:)
+      @logger.debug "reading #{File.basename(eml_path)}"
       msg = Mail.read(eml_path)
       message_id = msg.message_id || Digest::SHA256.hexdigest(File.read(eml_path))
 
-      return nil if already_normalized?(account, message_id)
+      if already_normalized?(account, message_id)
+        @logger.debug "skip: already normalized message_id=#{message_id}"
+        return nil
+      end
 
       body = extract_body(msg)
       fwd = parse_forwarded_header(body)
@@ -34,8 +40,10 @@ module MailWorkflows
         fwd[:forwarded_by] = format_address(msg[:from])
         fwd[:forwarded_date] = extract_date(msg)
         body = fwd[:body]
+        @logger.info "forwarded message detected (inline marker), original from: #{fwd[:from]}"
       else
         fwd = detect_header_forwarding(msg)
+        @logger.info "forwarded message detected (X-Forwarded-For: #{fwd[:forwarded_by]})" if fwd
       end
 
       stem = build_stem(msg, account, fwd: fwd)
@@ -44,6 +52,11 @@ module MailWorkflows
         msg, stem, account, folder, message_id, filenames,
         body: body, fwd: fwd
       )
+
+      @logger.info "normalized: #{File.basename(md_path)}"
+      @logger.info "  from: #{format_address(msg[:from])}"
+      @logger.info "  message-id: #{message_id}"
+      filenames.each { |a| @logger.info "  attachment: #{a}" }
 
       Result.new(
         path: md_path,
@@ -91,6 +104,7 @@ module MailWorkflows
       if collision?(out_dir, base_stem, account)
         mid = msg.message_id || ""
         suffix = Digest::SHA256.hexdigest(mid)[0, 8]
+        @logger.debug "stem collision for #{base_stem}, adding suffix #{suffix}"
         "#{base_stem}_#{suffix}"
       else
         base_stem
@@ -121,6 +135,7 @@ module MailWorkflows
 
       md_path = File.join(out_dir, "#{stem}.md")
       File.write(md_path, "#{frontmatter}\n#{body}\n")
+      @logger.debug "wrote #{md_path} (#{File.size(md_path)} bytes)"
       md_path
     end
 
@@ -162,25 +177,40 @@ module MailWorkflows
       if msg.multipart?
         # Prefer text/plain
         plain = msg.text_part
-        return plain.decoded if plain
+        if plain
+          @logger.debug "body: using text/plain part"
+          return plain.decoded
+        end
 
         # Fall back to text/html -> markdown
         html = msg.html_part
-        return html_to_markdown(html.decoded) if html
+        if html
+          @logger.debug "body: converting text/html to markdown"
+          return html_to_markdown(html.decoded)
+        end
 
         # Try first text part
         msg.parts.each do |part|
-          return part.decoded if part.content_type&.start_with?("text/plain")
-          return html_to_markdown(part.decoded) if part.content_type&.start_with?("text/html")
+          if part.content_type&.start_with?("text/plain")
+            @logger.debug "body: using text/plain from parts scan"
+            return part.decoded
+          end
+          if part.content_type&.start_with?("text/html")
+            @logger.debug "body: converting text/html from parts scan"
+            return html_to_markdown(part.decoded)
+          end
         end
+        @logger.debug "body: no usable text part found"
         nil
       elsif msg.content_type&.start_with?("text/html")
+        @logger.debug "body: converting single-part text/html"
         html_to_markdown(msg.decoded)
       else
+        @logger.debug "body: using single-part text/plain"
         msg.decoded
       end
-    rescue Mail::UnknownEncodingType, Encoding::UndefinedConversionError
-      # Fallback: try body raw value
+    rescue Mail::UnknownEncodingType, Encoding::UndefinedConversionError => e
+      @logger.warn "body: encoding error (#{e.class}), falling back to raw body"
       msg.body.to_s
     end
 
@@ -253,6 +283,7 @@ module MailWorkflows
         .strip
       Time.parse(cleaned)
     rescue ArgumentError
+      @logger.warn "could not parse forwarded date: #{date_str.inspect}"
       nil
     end
 
@@ -266,7 +297,19 @@ module MailWorkflows
     def all_attachments(msg)
       return [] unless msg.multipart?
 
-      msg.parts.select { |p| p.attachment? || inline_image?(p) }
+      collect_attachments(msg.parts)
+    end
+
+    def collect_attachments(parts)
+      parts.flat_map do |p|
+        if p.attachment? || inline_image?(p)
+          [p]
+        elsif p.multipart?
+          collect_attachments(p.parts)
+        else
+          []
+        end
+      end
     end
 
     def inline_image?(part)
@@ -291,6 +334,7 @@ module MailWorkflows
 
       out_dir = File.join(attachments_dir, stem)
       FileUtils.mkdir_p(out_dir)
+      @logger.debug "extracting #{attachments.size} attachment(s) to #{out_dir}"
 
       filenames = []
       name_counts = Hash.new(0)
@@ -299,7 +343,9 @@ module MailWorkflows
         name_counts[name] += 1
         name = deduplicate_filename(name, name_counts[name]) if name_counts[name] > 1
 
-        File.binwrite(File.join(out_dir, name), att.decoded)
+        path = File.join(out_dir, name)
+        File.binwrite(path, att.decoded)
+        @logger.debug "  extracted #{name} (#{File.size(path)} bytes)"
         filenames << name
       end
       filenames
