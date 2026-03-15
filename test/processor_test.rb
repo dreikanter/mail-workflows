@@ -252,6 +252,17 @@ class ProcessorTest < Minitest::Test
 
   # --- Frontmatter parsing ---
 
+  def test_invalid_frontmatter_counts_as_error
+    # Write a file without proper frontmatter delimiters
+    dir = File.join(@tmpdir, "normalized", "personal", "new")
+    File.write(File.join(dir, "20260301-080000_bad.md"), "no frontmatter here")
+
+    processor = MailWorkflows::Processor.new(@tmpdir)
+    counts = processor.run
+
+    assert_equal 1, counts[:errors]
+  end
+
   def test_body_with_markdown_horizontal_rule_does_not_corrupt_parsing
     write_rule("01-test.yml",
       name: "test-rule",
