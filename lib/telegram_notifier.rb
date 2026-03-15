@@ -33,7 +33,7 @@ module MailWorkflows
 
     def load_config
       path = File.join(@home, "accounts.yml")
-      yaml = YAML.load_file(path, permitted_classes: [Symbol])
+      yaml = YAML.safe_load_file(path, permitted_classes: [Symbol])
       yaml.dig("notifications", "telegram") || raise("missing notifications.telegram in accounts.yml")
     end
 

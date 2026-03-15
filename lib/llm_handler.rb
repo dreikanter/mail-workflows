@@ -68,7 +68,7 @@ module MailWorkflows
       config_path = File.join(@home, "accounts.yml")
       return "sonnet" unless File.exist?(config_path)
 
-      config = YAML.load_file(config_path, permitted_classes: [Symbol]) || {}
+      config = YAML.safe_load_file(config_path, permitted_classes: [Symbol]) || {}
       config.fetch("default_model", "sonnet")
     end
 
