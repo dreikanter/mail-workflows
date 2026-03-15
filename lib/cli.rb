@@ -58,23 +58,10 @@ module MailWorkflows
       end
 
       if force && Dir.exist?(path)
-        # Preserve user config, remove everything else
+        # Remove non-preserved contents selectively to avoid data loss window
         preserve = %w[accounts.yml rules prompts]
-        preserved = {}
-        preserve.each do |name|
-          src = File.join(path, name)
-          next unless File.exist?(src) || Dir.exist?(src)
-          tmp = Dir.mktmpdir
-          FileUtils.cp_r(src, File.join(tmp, name))
-          preserved[name] = tmp
-        end
-
-        FileUtils.rm_rf(path)
-
-        FileUtils.mkdir_p(path)
-        preserved.each do |name, tmp|
-          FileUtils.cp_r(File.join(tmp, name), File.join(path, name))
-          FileUtils.rm_rf(tmp)
+        (Dir.entries(path) - %w[. ..] - preserve).each do |entry|
+          FileUtils.rm_rf(File.join(path, entry))
         end
       end
 
@@ -101,6 +88,9 @@ module MailWorkflows
       log = MailWorkflows.create_logger(home: @home)
       errors = sync_mail(log)
       exit 1 if errors > 0
+    ensure
+      lock_file&.close
+      log&.close
     end
 
     def cmd_schedule
@@ -172,6 +162,14 @@ module MailWorkflows
         abort "This will delete all mail, normalized, and attachment data.\nUse --confirm to proceed."
       end
 
+      lock_path = File.join(@home, ".lock")
+      FileUtils.mkdir_p(File.dirname(lock_path))
+      lock_file = File.open(lock_path, File::CREAT | File::WRONLY)
+
+      unless lock_file.flock(File::LOCK_EX | File::LOCK_NB)
+        abort "A sync is running. Try again later."
+      end
+
       PURGE_DIRS.each do |dir|
         path = File.join(@home, dir)
         if Dir.exist?(path)
@@ -181,6 +179,8 @@ module MailWorkflows
       end
 
       $stderr.puts "purge complete"
+    ensure
+      lock_file&.close
     end
 
     def cmd_version
@@ -190,6 +190,8 @@ module MailWorkflows
     # --- Sync (extracted from former bin/sync) ---
 
     def sync_mail(log)
+      errors = 0
+
       generator = MailWorkflows::MbsyncrcGenerator.new(@home, logger: log)
       rc_path = generator.run
 
@@ -197,14 +199,18 @@ module MailWorkflows
         log.info "no accounts configured, skipping sync"
       else
         log.info "syncing mail"
-        system("mbsync", "-c", rc_path, "-a", exception: true)
+        begin
+          system("mbsync", "-c", rc_path, "-a", exception: true)
+        rescue RuntimeError => e
+          errors += 1
+          log.error "mbsync failed: #{e.message}"
+        end
       end
 
       store = MailWorkflows::MaildirStore.new(@home)
       normalizer = MailWorkflows::Normalizer.new(@home, logger: log)
 
       count = 0
-      errors = 0
 
       store.each_new_message do |filepath, maildir, account, folder|
         result = normalizer.normalize(filepath, account: account, folder: folder)
@@ -219,7 +225,8 @@ module MailWorkflows
       log.info "done: #{count} normalized, #{errors} errors"
 
       processor = MailWorkflows::Processor.new(@home, logger: log)
-      processor.run
+      proc_counts = processor.run
+      errors += proc_counts[:failed] + proc_counts[:errors]
 
       errors
     end
@@ -249,6 +256,7 @@ module MailWorkflows
 
     def install_crontab(lines)
       IO.popen("crontab -", "w") { |io| io.puts lines.join("\n") }
+      abort "Failed to install crontab" unless $?.success?
     end
 
     def accounts_template

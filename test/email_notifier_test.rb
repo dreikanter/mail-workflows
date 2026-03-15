@@ -17,7 +17,7 @@ class EmailNotifierTest < Minitest::Test
 
     captured_to = nil
     fake_mailer = Object.new
-    fake_mailer.define_singleton_method(:send) do |to:, **_kw|
+    fake_mailer.define_singleton_method(:deliver) do |to:, **_kw|
       captured_to = to
     end
 

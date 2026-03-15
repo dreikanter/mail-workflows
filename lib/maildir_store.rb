@@ -52,6 +52,10 @@ module MailWorkflows
     private
 
     def config
+      unless File.exist?(accounts_path)
+        raise "accounts.yml not found at #{accounts_path}. Run 'mw init' first."
+      end
+
       @config ||= YAML.safe_load_file(accounts_path, permitted_classes: [Symbol])
     end
 

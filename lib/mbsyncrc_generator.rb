@@ -12,6 +12,10 @@ module MailWorkflows
 
     def run
       config_path = File.join(@home, "accounts.yml")
+      unless File.exist?(config_path)
+        raise "accounts.yml not found at #{config_path}. Run 'mw init' first."
+      end
+
       @logger.info "loading accounts from #{config_path}"
       config = YAML.safe_load_file(config_path, permitted_classes: [Symbol])
       accounts = config.fetch("accounts", {})
@@ -42,7 +46,7 @@ module MailWorkflows
           f.puts "Host #{acct["host"]}"
           f.puts "Port #{acct.fetch("port", 993)}"
           f.puts "User #{acct["user"]}"
-          f.puts "PassCmd \"#{acct["pass_cmd"]}\""
+          f.puts "PassCmd \"#{acct["pass_cmd"].gsub('"', '\\"')}\""
           f.puts "TLSType #{tls_type}"
           f.puts "AuthMechs LOGIN"
           f.puts ""

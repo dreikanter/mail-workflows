@@ -9,8 +9,8 @@ module MailWorkflows
   #
   # Usage:
   #   mailer = Mailer.new(home)
-  #   mailer.send(to: "a@b.com", subject: "Hi", body: "Hello")
-  #   mailer.send(to: "a@b.com", subject: "Hi", html: "<h1>Hello</h1>")
+  #   mailer.deliver(to: "a@b.com", subject: "Hi", body: "Hello")
+  #   mailer.deliver(to: "a@b.com", subject: "Hi", html: "<h1>Hello</h1>")
   class Mailer
     def initialize(home, logger: NULL_LOGGER)
       @home = home
@@ -18,7 +18,7 @@ module MailWorkflows
       @config = load_config
     end
 
-    def send(to:, subject:, body: nil, html: nil, cc: nil)
+    def deliver(to:, subject:, body: nil, html: nil, cc: nil)
       raise ArgumentError, "body or html required" unless body || html
 
       msg = build_message(to: to, subject: subject, body: body, html: html, cc: cc)
