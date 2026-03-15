@@ -227,7 +227,7 @@ module MailWorkflows
     end
 
     def html_to_markdown(html)
-      ReverseMarkdown.convert(html, unknown_tags: :bypass).strip
+      ReverseMarkdown.convert(html, unknown_tags: :drop).strip
     end
 
     def force_utf8(text)
