@@ -32,7 +32,7 @@ module MailWorkflows
       rescue StandardError => e
         counts[:errors] += 1
         @logger.error "processor error #{File.basename(md_path)}: #{e.message}"
-        @logger.info e.backtrace&.first(5)&.join("\n")
+        @logger.error e.backtrace&.first(5)&.join("\n")
       end
 
       @logger.info "processor done: #{counts[:matched]} matched, " \
@@ -87,7 +87,9 @@ module MailWorkflows
       rescue StandardError => e
         increment_retries(md_path, retries)
         @logger.error "handler failed for #{File.basename(md_path)}: #{e.message}"
-        raise
+        @logger.error e.backtrace&.first(5)&.join("\n")
+        counts[:errors] += 1
+        return
       end
 
       save_output(rule, frontmatter, output)

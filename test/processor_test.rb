@@ -119,13 +119,16 @@ class ProcessorTest < Minitest::Test
       from: "noreply@bank.com", subject: "Fail", body: "Body")
 
     processor = MailWorkflows::Processor.new(@tmpdir)
-    processor.run
+    counts = processor.run
 
     # Email should stay in new/
     assert File.exist?(md_path)
     retries_file = "#{md_path}.retries"
     assert File.exist?(retries_file)
     assert_equal "1", File.read(retries_file).strip
+    # Handler failure counts as error, not double-counted
+    assert_equal 1, counts[:errors]
+    assert_equal 0, counts[:matched]
   end
 
   def test_max_retries_moves_to_failed
