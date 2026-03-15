@@ -42,7 +42,7 @@ module MailWorkflows
           f.puts "Host #{acct["host"]}"
           f.puts "Port #{acct.fetch("port", 993)}"
           f.puts "User #{acct["user"]}"
-          f.puts "PassCmd \"#{acct["pass_cmd"]}\""
+          f.puts "PassCmd \"#{acct["pass_cmd"].gsub('"', '\\"')}\""
           f.puts "TLSType #{tls_type}"
           f.puts "AuthMechs LOGIN"
           f.puts ""
