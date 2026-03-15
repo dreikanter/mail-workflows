@@ -524,19 +524,19 @@ class NormalizerTest < Minitest::Test
 
     # Stub Mail.read to return a message whose decoded raises
     original_read = Mail.method(:read)
-    Mail.define_singleton_method(:read) do |p|
+    fake_read = lambda do |p|
       msg = original_read.call(p)
       msg.define_singleton_method(:decoded) { raise Mail::UnknownEncodingType, "bad encoding" }
       msg
     end
 
-    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    Mail.stub(:read, fake_read) do
+      result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
 
-    assert result
-    content = File.read(result.path)
-    assert_includes content, "fallback body text"
-  ensure
-    Mail.define_singleton_method(:read, original_read)
+      assert result
+      content = File.read(result.path)
+      assert_includes content, "fallback body text"
+    end
   end
 
   def test_large_headers_with_many_recipients

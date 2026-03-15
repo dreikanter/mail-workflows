@@ -27,22 +27,20 @@ pipx install 'markitdown[pdf]'
 ```bash
 git clone git@github.com:dreikanter/mail-workflows.git ~/mail-workflows
 cd ~/mail-workflows
-bin/init
+bin/mw init
 $EDITOR ~/.mail-workflows/accounts.yml
 ```
 
 ## Running
 
 ```bash
-bin/run
+bin/mw run
 ```
 
 This is the main entry point. It acquires a lock (to prevent concurrent runs), then:
 
 1. **Sync** — generates `.mbsyncrc`, runs `mbsync` to pull new mail, normalizes messages into markdown
-2. **Process** — matches normalized messages against rules, runs preprocessing and handlers *(coming soon)*
-
-You can also run `bin/sync` directly to sync and normalize without processing.
+2. **Process** — matches normalized messages against rules, runs handlers
 
 Normalized messages go to `~/.mail-workflows/normalized/<account>/new/`.
 
@@ -86,14 +84,6 @@ To update an existing password, delete and re-add:
 ```bash
 security delete-generic-password -s mail-workflows-personal
 security add-generic-password -s mail-workflows-personal -a "$USER" -w "new-app-password"
-```
-
-## Scheduling
-
-```bash
-bin/schedule on       # install cron entry (every 5 minutes)
-bin/schedule off      # remove it
-bin/schedule status   # check
 ```
 
 ## Development
