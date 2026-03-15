@@ -445,6 +445,84 @@ class NormalizerTest < Minitest::Test
     assert frontmatter["forwarded_by"]
   end
 
+  def test_converts_pdf_attachments_to_markdown
+    eml = build_eml(
+      from: "a@example.com",
+      to: "b@example.com",
+      subject: "PDF Convert",
+      body: "See attached.",
+      attachments: [{ name: "report.pdf", content: "fake pdf content" }]
+    )
+    path = write_eml(eml)
+
+    # Stub markitdown by putting a script on PATH that writes a .md file
+    stub_bin = File.join(@tmpdir, "bin")
+    FileUtils.mkdir_p(stub_bin)
+    File.write(File.join(stub_bin, "markitdown"), <<~SH)
+      #!/bin/sh
+      # Write markdown output to the -o target
+      shift  # skip input file
+      shift  # skip -o flag
+      echo "# Converted PDF" > "$1"
+    SH
+    File.chmod(0o755, File.join(stub_bin, "markitdown"))
+
+    with_path_prepend(stub_bin) do
+      result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+      stem = File.basename(result.path, ".md")
+      att_dir = File.join(@tmpdir, "attachments", stem)
+
+      assert_path_exists File.join(att_dir, "report.pdf.md"),
+                         "markitdown should create report.pdf.md"
+      assert_includes File.read(File.join(att_dir, "report.pdf.md")), "Converted PDF"
+    end
+  end
+
+  def test_skips_markitdown_for_non_pdf_attachments
+    eml = build_eml(
+      from: "a@example.com",
+      to: "b@example.com",
+      subject: "Non PDF",
+      body: "See attached.",
+      attachments: [{ name: "image.png", content: "fake png" }]
+    )
+    path = write_eml(eml)
+
+    result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+    stem = File.basename(result.path, ".md")
+    att_dir = File.join(@tmpdir, "attachments", stem)
+
+    refute_path_exists File.join(att_dir, "image.png.md"),
+                       "should not create .md for non-PDF attachments"
+  end
+
+  def test_handles_markitdown_failure_gracefully
+    eml = build_eml(
+      from: "a@example.com",
+      to: "b@example.com",
+      subject: "Bad PDF",
+      body: "See attached.",
+      attachments: [{ name: "broken.pdf", content: "not a pdf" }]
+    )
+    path = write_eml(eml)
+
+    # Stub markitdown that always fails
+    stub_bin = File.join(@tmpdir, "bin")
+    FileUtils.mkdir_p(stub_bin)
+    File.write(File.join(stub_bin, "markitdown"), <<~SH)
+      #!/bin/sh
+      exit 1
+    SH
+    File.chmod(0o755, File.join(stub_bin, "markitdown"))
+
+    with_path_prepend(stub_bin) do
+      result = @normalizer.normalize(path, account: "personal", folder: "INBOX")
+      # Should still succeed — markitdown failure is non-fatal
+      assert result
+      assert_equal ["broken.pdf"], result.attachments
+    end
+  end
+
   def test_non_forwarded_message_has_no_forwarding_fields
     eml = build_eml(
       from: "alice@example.com",
@@ -626,5 +704,13 @@ class NormalizerTest < Minitest::Test
     path = File.join(dir, filename)
     File.write(path, content)
     path
+  end
+
+  def with_path_prepend(dir)
+    old_path = ENV.fetch("PATH", nil)
+    ENV["PATH"] = "#{dir}:#{old_path}"
+    yield
+  ensure
+    ENV["PATH"] = old_path
   end
 end
