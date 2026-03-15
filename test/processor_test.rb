@@ -228,6 +228,28 @@ class ProcessorTest < Minitest::Test
     refute File.exist?("#{md_path}.retries")
   end
 
+  # --- Notification failure resilience ---
+
+  def test_notification_failure_does_not_block_processing
+    write_rule("01-test.yml",
+      name: "test-rule",
+      match: { "from" => "bank.com" },
+      handler: { "type" => "script", "command" => write_handler_script },
+      notify: [{ "type" => "telegram" }])
+
+    # No accounts.yml with telegram config → TelegramNotifier will raise
+    write_email("personal", "20260301-080000_notify-fail.md",
+      from: "noreply@bank.com", subject: "Statement", body: "Body")
+
+    processor = MailWorkflows::Processor.new(@tmpdir)
+    counts = processor.run
+
+    # Email should still be processed successfully despite notification failure
+    assert_equal 1, counts[:matched]
+    assert_empty Dir.glob(File.join(@tmpdir, "normalized/personal/new/*.md"))
+    assert_equal 1, Dir.glob(File.join(@tmpdir, "normalized/personal/processed/*.md")).size
+  end
+
   # --- Frontmatter parsing ---
 
   def test_body_with_markdown_horizontal_rule_does_not_corrupt_parsing
