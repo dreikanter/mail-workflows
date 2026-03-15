@@ -108,7 +108,7 @@ module MailWorkflows
       # Check for collision and add suffix if needed
       out_dir = File.join(normalized_dir(account), "new")
       if collision?(out_dir, base_stem, account)
-        mid = msg.message_id || ""
+        mid = msg.message_id || Digest::SHA256.hexdigest(msg.raw_source)
         suffix = Digest::SHA256.hexdigest(mid)[0, 8]
         @logger.info "stem collision for #{base_stem}, adding suffix #{suffix}"
         "#{base_stem}_#{suffix}"
