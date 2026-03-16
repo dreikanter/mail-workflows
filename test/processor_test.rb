@@ -5,7 +5,7 @@ require_relative "test_helper"
 class ProcessorTest < Minitest::Test
   def setup
     @tmpdir = Dir.mktmpdir("processor-test")
-    %w[rules prompts normalized/personal/new normalized/personal/processed state].each do |dir|
+    %w[normalized/personal/new normalized/personal/processed state].each do |dir|
       FileUtils.mkdir_p(File.join(@tmpdir, dir))
     end
   end
@@ -32,10 +32,11 @@ class ProcessorTest < Minitest::Test
   # --- Rule matching ---
 
   def test_matching_rule_runs_handler
-    write_rule("01-test.yml",
-               name: "test-rule",
-               match: { "from" => "bank.com" },
-               handler: { "type" => "script", "command" => write_handler_script })
+    write_rule(
+      name: "test-rule",
+      match: { "from" => "bank.com" },
+      handler: { "type" => "script", "command" => write_handler_script }
+    )
 
     write_email("personal", "20260301-080000_statement.md",
                 from: "noreply@bank.com", subject: "Monthly Statement", body: "Your balance is $100")
@@ -49,10 +50,11 @@ class ProcessorTest < Minitest::Test
   end
 
   def test_handler_output_saved_to_state_dir
-    write_rule("01-test.yml",
-               name: "test-rule",
-               match: { "from" => "bank.com" },
-               handler: { "type" => "script", "command" => write_handler_script })
+    write_rule(
+      name: "test-rule",
+      match: { "from" => "bank.com" },
+      handler: { "type" => "script", "command" => write_handler_script }
+    )
 
     write_email("personal", "20260301-080000_statement.md",
                 from: "noreply@bank.com", subject: "Monthly Statement", body: "Balance")
@@ -70,10 +72,11 @@ class ProcessorTest < Minitest::Test
   # --- Non-matching email ---
 
   def test_non_matching_email_moves_to_processed
-    write_rule("01-test.yml",
-               name: "test-rule",
-               match: { "from" => "bank.com" },
-               handler: { "type" => "script", "command" => write_handler_script })
+    write_rule(
+      name: "test-rule",
+      match: { "from" => "bank.com" },
+      handler: { "type" => "script", "command" => write_handler_script }
+    )
 
     write_email("personal", "20260301-080000_random.md",
                 from: "friend@example.com", subject: "Hey", body: "What's up?")
@@ -106,10 +109,11 @@ class ProcessorTest < Minitest::Test
   # --- Handler failure ---
 
   def test_handler_failure_moves_to_failed
-    write_rule("01-test.yml",
-               name: "test-rule",
-               match: { "from" => "bank.com" },
-               handler: { "type" => "script", "command" => write_failing_script })
+    write_rule(
+      name: "test-rule",
+      match: { "from" => "bank.com" },
+      handler: { "type" => "script", "command" => write_failing_script }
+    )
 
     md_path = write_email("personal", "20260301-080000_fail.md",
                           from: "noreply@bank.com", subject: "Fail", body: "Body")
@@ -125,10 +129,11 @@ class ProcessorTest < Minitest::Test
   # --- Preprocessed content ---
 
   def test_loads_preprocessed_pdf_content
-    write_rule("01-test.yml",
-               name: "test-rule",
-               match: { "from" => "bank.com" },
-               handler: { "type" => "script", "command" => write_echo_input_script })
+    write_rule(
+      name: "test-rule",
+      match: { "from" => "bank.com" },
+      handler: { "type" => "script", "command" => write_echo_input_script }
+    )
 
     stem = "20260301-080000_statement"
     att_dir = File.join(@tmpdir, "attachments", stem)
@@ -151,10 +156,11 @@ class ProcessorTest < Minitest::Test
   # --- Handler input structure ---
 
   def test_handler_input_contains_expected_fields
-    write_rule("01-test.yml",
-               name: "test-rule",
-               match: { "from" => "bank.com" },
-               handler: { "type" => "script", "command" => write_echo_input_script, "model" => "haiku" })
+    write_rule(
+      name: "test-rule",
+      match: { "from" => "bank.com" },
+      handler: { "type" => "script", "command" => write_echo_input_script, "model" => "haiku" }
+    )
 
     write_email("personal", "20260301-080000_test.md",
                 from: "noreply@bank.com",
@@ -180,13 +186,14 @@ class ProcessorTest < Minitest::Test
   # --- Notification failure resilience ---
 
   def test_notification_failure_does_not_block_processing
-    write_rule("01-test.yml",
-               name: "test-rule",
-               match: { "from" => "bank.com" },
-               handler: { "type" => "script", "command" => write_handler_script },
-               notify: [{ "type" => "telegram" }])
+    write_rule(
+      name: "test-rule",
+      match: { "from" => "bank.com" },
+      handler: { "type" => "script", "command" => write_handler_script },
+      notify: [{ "type" => "telegram" }]
+    )
 
-    # No accounts.yml with telegram config → TelegramNotifier will raise
+    # No config.yml with telegram config → TelegramNotifier will raise
     write_email("personal", "20260301-080000_notify-fail.md",
                 from: "noreply@bank.com", subject: "Statement", body: "Body")
 
@@ -213,10 +220,11 @@ class ProcessorTest < Minitest::Test
   end
 
   def test_body_with_markdown_horizontal_rule_does_not_corrupt_parsing
-    write_rule("01-test.yml",
-               name: "test-rule",
-               match: { "from" => "bank.com" },
-               handler: { "type" => "script", "command" => write_echo_input_script })
+    write_rule(
+      name: "test-rule",
+      match: { "from" => "bank.com" },
+      handler: { "type" => "script", "command" => write_echo_input_script }
+    )
 
     write_email("personal", "20260301-080000_hr.md",
                 from: "noreply@bank.com", subject: "Report",
@@ -254,9 +262,12 @@ class ProcessorTest < Minitest::Test
     path
   end
 
-  def write_rule(filename, name:, match:, handler:, notify: [])
-    data = { "name" => name, "match" => match, "handler" => handler, "notify" => notify }
-    File.write(File.join(@tmpdir, "rules", filename), YAML.dump(data))
+  def write_rule(name:, match:, handler:, notify: [])
+    config_path = File.join(@tmpdir, "config.yml")
+    config = File.exist?(config_path) ? (YAML.safe_load_file(config_path) || {}) : {}
+    config["rules"] ||= []
+    config["rules"] << { "name" => name, "match" => match, "handler" => handler, "notify" => notify }
+    File.write(config_path, YAML.dump(config))
   end
 
   def write_handler_script

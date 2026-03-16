@@ -46,6 +46,6 @@ class EmailNotifierTest < Minitest::Test
         }
       }
     }
-    File.write(File.join(@tmpdir, "accounts.yml"), YAML.dump(config))
+    File.write(File.join(@tmpdir, "config.yml"), YAML.dump(config))
   end
 end

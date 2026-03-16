@@ -12,7 +12,7 @@ handler processes the email and optionally sends notifications.
 
 ## Rules
 
-A rule is a YAML file in `$MAIL_WORKFLOWS_HOME/rules/`. It defines:
+A rule is defined in the `rules` section of `config.yml`. It specifies:
 
 - **`name`** — unique identifier, also scopes the handler's persistent state
   directory
@@ -20,7 +20,7 @@ A rule is a YAML file in `$MAIL_WORKFLOWS_HOME/rules/`. It defines:
 - **`handler`** — what to run when the rule matches
 - **`notify`** — optional list of notification channels
 
-Rules are evaluated in filename order. First match wins.
+Rules are evaluated in definition order. First match wins.
 
 ### Match Criteria
 
@@ -39,22 +39,20 @@ Plain strings are substring matches.
 ### Example Rule
 
 ```yaml
-# ~/.mail-workflows/rules/bank-statements.yml
-name: bank-statements
-
-match:
-  from: '/statements@(megabank|otherbank)\.com/'
-  subject: '/monthly statement/i'
-
-handler:
-  type: llm
-  model: haiku
-  prompt: bank-statement
-
-notify:
-  - type: telegram
-  - type: email
-    to: user@gmail.com
+# In ~/.mail-workflows/config.yml
+rules:
+  - name: bank-statements
+    match:
+      from: '/statements@(megabank|otherbank)\.com/'
+      subject: '/monthly statement/i'
+    handler:
+      type: llm
+      model: haiku
+      prompt: bank-statement
+    notify:
+      - type: telegram
+      - type: email
+        to: user@gmail.com
 ```
 
 ## Handler Interface
@@ -131,10 +129,10 @@ for most use cases — summarization, extraction, classification, analysis.
 handler:
   type: llm
   model: haiku           # optional, defaults to project default
-  prompt: bank-statement # references prompts/<name>.md
+  prompt: bank-statement # references prompts.<name> in config.yml
 ```
 
-The prompt template is a Markdown file in `$MAIL_WORKFLOWS_HOME/prompts/`
+The prompt template is defined in the `prompts` section of `config.yml`
 with `{{placeholder}}` substitution:
 
 - `{{EMAIL_CONTENT}}` — the normalized email body
@@ -182,15 +180,15 @@ or cases where you need full control over the processing logic.
 
 ## Notifications
 
-Notification channels are configured in `accounts.yml` under `notifications`.
+Notification channels are configured in `config.yml` under `notifications`.
 Each rule can trigger multiple channels.
 
 ### Built-in Notifiers
 
 | Type | Config source | Sends |
 |------|--------------|-------|
-| `email` | `accounts.yml → notifications.email` | Summary + body via SMTP |
-| `telegram` | `accounts.yml → notifications.telegram` | Summary via Bot API |
+| `email` | `config.yml → notifications.email` | Summary + body via SMTP |
+| `telegram` | `config.yml → notifications.telegram` | Summary via Bot API |
 | `desktop` | none | macOS notification via `osascript` |
 
 Notifiers receive the handler's JSON output plus email metadata (from,
@@ -256,7 +254,7 @@ for each .md in normalized/<account>/new/:
 
 ## Design Decisions
 
-- **Default model** is configured in `accounts.yml`. One `--path` = one
+- **Default model** is configured in `config.yml`. One `--path` = one
   configuration.
 - **Prompt templates** use simple `{{placeholder}}` substitution.
 - **Handlers process one email at a time** (no batching).

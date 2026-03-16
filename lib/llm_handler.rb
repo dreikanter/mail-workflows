@@ -47,13 +47,16 @@ module MailWorkflows
     end
 
     def assemble_prompt(prompt_name, input)
-      path = File.join(@home, "prompts", "#{prompt_name}.md")
-      raise "prompt template not found: #{path}" unless File.exist?(path)
-
-      template = File.read(path)
+      template = load_prompt(prompt_name)
       template
         .gsub("{{EMAIL_CONTENT}}", wrap_untrusted(input.dig("email", "body") || ""))
         .gsub("{{PREPROCESSED}}", wrap_untrusted(format_preprocessed(input.fetch("preprocessed", {}))))
+    end
+
+    def load_prompt(prompt_name)
+      config = load_config
+      prompts = config.fetch("prompts", {})
+      prompts.fetch(prompt_name) { raise "prompt template not found: #{prompt_name}" }
     end
 
     def wrap_untrusted(text)
@@ -76,11 +79,14 @@ module MailWorkflows
     end
 
     def default_model
-      config_path = File.join(@home, "accounts.yml")
-      return "sonnet" unless File.exist?(config_path)
+      load_config.fetch("default_model", "sonnet")
+    end
 
-      config = YAML.safe_load_file(config_path, permitted_classes: [Symbol]) || {}
-      config.fetch("default_model", "sonnet")
+    def load_config
+      config_path = File.join(@home, "config.yml")
+      return {} unless File.exist?(config_path)
+
+      YAML.safe_load_file(config_path, permitted_classes: [Symbol]) || {}
     end
 
     def parse_claude_output(stdout)

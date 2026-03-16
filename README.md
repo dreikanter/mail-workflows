@@ -28,7 +28,7 @@ pipx install 'markitdown[pdf]'
 git clone git@github.com:dreikanter/mail-workflows.git ~/mail-workflows
 cd ~/mail-workflows
 bin/mw init
-$EDITOR ~/.mail-workflows/accounts.yml
+$EDITOR ~/.mail-workflows/config.yml
 ```
 
 ## Running
@@ -46,7 +46,7 @@ Normalized messages go to `~/.mail-workflows/normalized/<account>/new/`.
 
 ## Passwords
 
-Passwords are never stored in config files. Instead, `accounts.yml` references external commands via `pass_cmd` that retrieve credentials at runtime.
+Passwords are never stored in config files. Instead, `config.yml` references external commands via `pass_cmd` that retrieve credentials at runtime.
 
 On macOS, use Keychain:
 
@@ -58,7 +58,7 @@ security add-generic-password -s mail-workflows-personal -a "$USER" -w "your-ima
 security find-generic-password -s mail-workflows-personal -w
 ```
 
-Then reference it in `~/.mail-workflows/accounts.yml`:
+Then reference it in `~/.mail-workflows/config.yml`:
 
 ```yaml
 accounts:

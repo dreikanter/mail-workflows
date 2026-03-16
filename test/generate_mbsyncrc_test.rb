@@ -145,7 +145,7 @@ class MbsyncrcGeneratorTest < Minitest::Test
   private
 
   def write_accounts(data)
-    File.write(File.join(@tmpdir, "accounts.yml"), YAML.dump(data))
+    File.write(File.join(@tmpdir, "config.yml"), YAML.dump(data))
   end
 
   def run_generator

@@ -3,7 +3,7 @@
 require "yaml"
 module MailWorkflows
   # Manages all Maildir folders across configured accounts.
-  # Reads account configuration from accounts.yml and provides
+  # Reads account configuration from config.yml and provides
   # access to individual Maildir instances.
   class MaildirStore
     attr_reader :home
@@ -52,19 +52,19 @@ module MailWorkflows
     private
 
     def config
-      unless File.exist?(accounts_path)
-        raise "accounts.yml not found at #{accounts_path}. Run 'mw init' first."
+      unless File.exist?(config_path)
+        raise "config.yml not found at #{config_path}. Run 'mw init' first."
       end
 
-      @config ||= YAML.safe_load_file(accounts_path, permitted_classes: [Symbol])
+      @config ||= YAML.safe_load_file(config_path, permitted_classes: [Symbol])
     end
 
     def accounts
       config.fetch("accounts", {})
     end
 
-    def accounts_path
-      File.join(@home, "accounts.yml")
+    def config_path
+      File.join(@home, "config.yml")
     end
 
     def mail_path

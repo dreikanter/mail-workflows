@@ -23,7 +23,7 @@ configurable processing handlers on incoming emails.
 cron (every N minutes)
   +-- mw run
       +-- 1. acquire lock (flock, skip if already running)
-      +-- 2. generate .mbsyncrc from accounts.yml
+      +-- 2. generate .mbsyncrc from config.yml
       +-- 3. run mbsync to pull new mail → Maildir new/
       +-- 4. normalize: for each .eml in new/
               +-- parse MIME (mail gem)
@@ -66,9 +66,7 @@ mail-workflows/
 
 ```
 ~/.mail-workflows/
-+-- accounts.yml           # IMAP accounts, notification settings
-+-- rules/                 # One YAML per rule (planned)
-+-- prompts/               # Prompt templates (planned)
++-- config.yml             # IMAP accounts, rules, prompts, notification settings
 +-- mail/                  # Maildir storage (raw MIME, managed by mbsync)
 |   +-- <account>/
 |       +-- <folder>/
@@ -89,7 +87,7 @@ mail-workflows/
 ```
 
 The `mw init` command creates this directory structure and writes a template
-`accounts.yml`.
+`config.yml`.
 
 ## CLI Commands
 
@@ -113,12 +111,12 @@ Global option `--path DIR` overrides the data directory.
 - Idempotent: re-running after downtime just downloads what's new
 - Supports multiple accounts
 
-`.mbsyncrc` is generated from `accounts.yml` at the start of each run.
+`.mbsyncrc` is generated from `config.yml` at the start of each run.
 
 ## Account Configuration
 
 ```yaml
-# ~/.mail-workflows/accounts.yml
+# ~/.mail-workflows/config.yml
 accounts:
   personal:
     host: imap.gmail.com
@@ -221,7 +219,7 @@ runs. A second invocation exits silently.
 | Concurrent runs | `flock` on lockfile, second run skips |
 | Downtime / missed crons | mbsync fetches all accumulated mail; normalizer handles batch |
 | Normalization failure | `.eml` stays in `new/`, retried next run |
-| Credential security | `accounts.yml` lives outside repo; passwords via external commands |
+| Credential security | `config.yml` lives outside repo; passwords via external commands |
 
 ## Dependencies
 

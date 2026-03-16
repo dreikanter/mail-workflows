@@ -45,18 +45,18 @@ class CLITest < Minitest::Test
     path = File.join(@tmpdir, "new-home")
     run_mw("init #{Shellwords.shellescape(path)}")
 
-    %w[rules prompts mail normalized attachments state log].each do |dir|
+    %w[mail normalized attachments state log].each do |dir|
       assert Dir.exist?(File.join(path, dir)), "Expected #{dir}/ to exist"
     end
-    assert_path_exists File.join(path, "accounts.yml")
+    assert_path_exists File.join(path, "config.yml")
   end
 
   def test_init_uses_path_flag
     path = File.join(@tmpdir, "flagged")
     run_mw("--path #{Shellwords.shellescape(path)} init")
 
-    assert Dir.exist?(File.join(path, "rules"))
-    assert_path_exists File.join(path, "accounts.yml")
+    assert Dir.exist?(File.join(path, "mail"))
+    assert_path_exists File.join(path, "config.yml")
   end
 
   def test_init_refuses_existing_dir
@@ -73,18 +73,18 @@ class CLITest < Minitest::Test
 
     run_mw("init --force #{Shellwords.shellescape(path)}")
 
-    assert Dir.exist?(File.join(path, "rules"))
+    assert Dir.exist?(File.join(path, "mail"))
     refute Dir.exist?(File.join(path, "stale"))
   end
 
-  def test_init_preserves_existing_accounts_yml
+  def test_init_preserves_existing_config_yml
     path = File.join(@tmpdir, "preserve")
     FileUtils.mkdir_p(path)
-    File.write(File.join(path, "accounts.yml"), "custom: true\n")
+    File.write(File.join(path, "config.yml"), "custom: true\n")
 
     run_mw("init --force #{Shellwords.shellescape(path)}")
 
-    assert_equal "custom: true\n", File.read(File.join(path, "accounts.yml"))
+    assert_equal "custom: true\n", File.read(File.join(path, "config.yml"))
   end
 
   # --- purge ---
@@ -109,14 +109,11 @@ class CLITest < Minitest::Test
 
   def test_purge_preserves_config
     FileUtils.mkdir_p(File.join(@tmpdir, "mail"))
-    FileUtils.mkdir_p(File.join(@tmpdir, "rules"))
-    File.write(File.join(@tmpdir, "accounts.yml"), "accounts: {}")
-    File.write(File.join(@tmpdir, "rules/test.yml"), "match: {}")
+    File.write(File.join(@tmpdir, "config.yml"), "accounts: {}")
 
     run_mw("--path #{Shellwords.shellescape(@tmpdir)} purge --confirm")
 
-    assert_path_exists File.join(@tmpdir, "accounts.yml")
-    assert_path_exists File.join(@tmpdir, "rules/test.yml")
+    assert_path_exists File.join(@tmpdir, "config.yml")
   end
 
   def test_purge_succeeds_when_dirs_missing
