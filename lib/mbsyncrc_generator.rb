@@ -3,7 +3,7 @@
 require "yaml"
 require "fileutils"
 module MailWorkflows
-  # Generates .mbsyncrc from accounts.yml and ensures Maildir directories exist.
+  # Generates .mbsyncrc from config.yml and ensures Maildir directories exist.
   class MbsyncrcGenerator
     def initialize(home, logger: NULL_LOGGER)
       @home = home
@@ -11,9 +11,9 @@ module MailWorkflows
     end
 
     def run
-      config_path = File.join(@home, "accounts.yml")
+      config_path = File.join(@home, "config.yml")
       unless File.exist?(config_path)
-        raise "accounts.yml not found at #{config_path}. Run 'mw init' first."
+        raise "config.yml not found at #{config_path}. Run 'mw init' first."
       end
 
       @logger.info "loading accounts from #{config_path}"

@@ -32,7 +32,7 @@ module MailWorkflows
     private
 
     def default_to
-      config_path = File.join(@home, "accounts.yml")
+      config_path = File.join(@home, "config.yml")
       yaml = YAML.safe_load_file(config_path, permitted_classes: [Symbol])
       yaml.dig("notifications", "email", "from") || raise("no default email recipient configured")
     end

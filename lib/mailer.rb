@@ -4,7 +4,7 @@ require "mail"
 require "open3"
 require "yaml"
 module MailWorkflows
-  # Sends email via SMTP using credentials from accounts.yml.
+  # Sends email via SMTP using credentials from config.yml.
   # Reads SMTP settings from the notifications.email section.
   #
   # Usage:
@@ -78,7 +78,7 @@ module MailWorkflows
     end
 
     def load_config
-      path = File.join(@home, "accounts.yml")
+      path = File.join(@home, "config.yml")
       yaml = YAML.safe_load_file(path, permitted_classes: [Symbol])
       email_config = yaml.dig("notifications", "email")
       raise "missing notifications.email in #{path}" unless email_config

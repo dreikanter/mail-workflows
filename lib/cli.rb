@@ -66,18 +66,18 @@ module MailWorkflows
 
       if force && Dir.exist?(path)
         # Remove non-preserved contents selectively to avoid data loss window
-        preserve = %w[accounts.yml rules prompts]
+        preserve = %w[config.yml]
         (Dir.entries(path) - %w[. ..] - preserve).each do |entry|
           FileUtils.rm_rf(File.join(path, entry))
         end
       end
 
-      %w[rules prompts mail normalized attachments state log].each do |dir|
+      %w[mail normalized attachments state log].each do |dir|
         FileUtils.mkdir_p(File.join(path, dir))
       end
 
-      accounts_path = File.join(path, "accounts.yml")
-      File.write(accounts_path, accounts_template) unless File.exist?(accounts_path)
+      config_path = File.join(path, "config.yml")
+      File.write(config_path, config_template) unless File.exist?(config_path)
 
       puts "Initialized #{path}"
     end
@@ -141,9 +141,9 @@ module MailWorkflows
       puts ""
       puts "Data directory: #{@home}"
 
-      accounts_path = File.join(@home, "accounts.yml")
-      if File.exist?(accounts_path)
-        config = YAML.safe_load_file(accounts_path, permitted_classes: [Symbol]) || {}
+      config_path = File.join(@home, "config.yml")
+      if File.exist?(config_path)
+        config = YAML.safe_load_file(config_path, permitted_classes: [Symbol]) || {}
         accounts = config.fetch("accounts", {})
         if accounts.any?
           puts "Accounts:"
@@ -155,7 +155,7 @@ module MailWorkflows
           puts "Accounts: none configured"
         end
       else
-        puts "Accounts: not configured (no accounts.yml)"
+        puts "Accounts: not configured (no config.yml)"
       end
     end
 
@@ -266,9 +266,9 @@ module MailWorkflows
       abort "Failed to install crontab" unless $CHILD_STATUS.success?
     end
 
-    def accounts_template
+    def config_template
       <<~YAML
-        # Mail Workflows - Account Configuration
+        # Mail Workflows Configuration
         #
         # See README.md for setup instructions.
         #
@@ -281,6 +281,19 @@ module MailWorkflows
         #     tls: true
         #     folders:
         #       - INBOX
+        #
+        # rules:
+        #   - name: bank-statements
+        #     match:
+        #       from: bank.com
+        #     handler:
+        #       type: llm
+        #       prompt: bank-statement
+        #
+        # prompts:
+        #   bank-statement: |
+        #     Analyze this email:
+        #     {{EMAIL_CONTENT}}
       YAML
     end
 

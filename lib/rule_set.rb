@@ -3,11 +3,11 @@
 require "yaml"
 
 module MailWorkflows
-  # A single rule loaded from a YAML file in rules/.
-  Rule = Struct.new(:name, :match, :handler, :notify, :source_path)
+  # A single rule loaded from the rules section of config.yml.
+  Rule = Struct.new(:name, :match, :handler, :notify)
 
-  # Loads rules from YAML files and matches them against normalized emails.
-  # Rules are evaluated in filename order; first match wins.
+  # Loads rules from config.yml and matches them against normalized emails.
+  # Rules are evaluated in definition order; first match wins.
   class RuleSet
     attr_reader :rules
 
@@ -33,20 +33,18 @@ module MailWorkflows
 
     private
 
-    def rules_dir
-      File.join(@home, "rules")
-    end
-
     def load_rules
-      dir = rules_dir
-      return [] unless Dir.exist?(dir)
+      config_path = File.join(@home, "config.yml")
+      return [] unless File.exist?(config_path)
 
-      Dir.glob(File.join(dir, "*.yml")).filter_map do |path|
-        data = YAML.safe_load_file(path, permitted_classes: [Symbol])
+      config = YAML.safe_load_file(config_path, permitted_classes: [Symbol])
+      entries = config&.fetch("rules", nil) || []
+
+      entries.filter_map do |data|
         name = data.fetch("name")
 
         unless valid_rule_name?(name)
-          @logger.error "invalid rule name #{name.inspect} in #{path}, skipping"
+          @logger.error "invalid rule name #{name.inspect}, skipping"
           next
         end
 
@@ -54,8 +52,7 @@ module MailWorkflows
           name: name,
           match: data.fetch("match", {}),
           handler: data.fetch("handler"),
-          notify: data.fetch("notify", []),
-          source_path: path
+          notify: data.fetch("notify", [])
         )
       end
     end

@@ -6,8 +6,7 @@ class LlmHandlerTest < Minitest::Test
   def setup
     @tmpdir = Dir.mktmpdir("llm-handler-test")
     @state_dir = File.join(@tmpdir, "state", "test-rule")
-    @prompts_dir = File.join(@tmpdir, "prompts")
-    FileUtils.mkdir_p([@state_dir, @prompts_dir])
+    FileUtils.mkdir_p(@state_dir)
   end
 
   def teardown
@@ -15,7 +14,7 @@ class LlmHandlerTest < Minitest::Test
   end
 
   def test_assembles_prompt_with_placeholders
-    File.write(File.join(@prompts_dir, "test.md"), <<~MD)
+    write_prompt("test", <<~MD)
       Analyze this email:
 
       {{EMAIL_CONTENT}}
@@ -48,7 +47,7 @@ class LlmHandlerTest < Minitest::Test
   end
 
   def test_includes_preprocessed_content
-    File.write(File.join(@prompts_dir, "test.md"), "{{PREPROCESSED}}")
+    write_prompt("test", "{{PREPROCESSED}}")
 
     input = sample_input.merge(
       "preprocessed" => { "doc.pdf" => "Extracted PDF content here" }
@@ -70,7 +69,7 @@ class LlmHandlerTest < Minitest::Test
   end
 
   def test_parses_claude_json_output
-    File.write(File.join(@prompts_dir, "test.md"), "{{EMAIL_CONTENT}}")
+    write_prompt("test", "{{EMAIL_CONTENT}}")
 
     handler = MailWorkflows::LlmHandler.new(@tmpdir)
     status = stub_success_status
@@ -87,7 +86,7 @@ class LlmHandlerTest < Minitest::Test
   end
 
   def test_execute_success
-    File.write(File.join(@prompts_dir, "test.md"), "Analyze: {{EMAIL_CONTENT}}")
+    write_prompt("test", "Analyze: {{EMAIL_CONTENT}}")
 
     handler = MailWorkflows::LlmHandler.new(@tmpdir)
     status = stub_success_status
@@ -99,7 +98,7 @@ class LlmHandlerTest < Minitest::Test
   end
 
   def test_execute_raises_on_claude_failure
-    File.write(File.join(@prompts_dir, "test.md"), "{{EMAIL_CONTENT}}")
+    write_prompt("test", "{{EMAIL_CONTENT}}")
 
     handler = MailWorkflows::LlmHandler.new(@tmpdir)
     status = Object.new
@@ -113,7 +112,7 @@ class LlmHandlerTest < Minitest::Test
   end
 
   def test_execute_raises_on_timeout
-    File.write(File.join(@prompts_dir, "test.md"), "{{EMAIL_CONTENT}}")
+    write_prompt("test", "{{EMAIL_CONTENT}}")
 
     handler = MailWorkflows::LlmHandler.new(@tmpdir)
 
@@ -147,6 +146,14 @@ class LlmHandlerTest < Minitest::Test
     status = Object.new
     status.define_singleton_method(:success?) { true }
     status
+  end
+
+  def write_prompt(name, content)
+    config_path = File.join(@tmpdir, "config.yml")
+    config = File.exist?(config_path) ? (YAML.safe_load_file(config_path) || {}) : {}
+    config["prompts"] ||= {}
+    config["prompts"][name] = content
+    File.write(config_path, YAML.dump(config))
   end
 
   def claude_json_response(summary)

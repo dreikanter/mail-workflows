@@ -27,15 +27,11 @@ class PurgeTest < Minitest::Test
 
   def test_preserves_config_files
     write_file("mail/personal/INBOX/new/msg.eml")
-    write_file("accounts.yml", "accounts: {}")
-    write_file("rules/bank.yml", "match: {}")
-    write_file("prompts/bank.md", "prompt")
+    write_file("config.yml", "accounts: {}")
 
     run_purge
 
-    assert_path_exists File.join(@tmpdir, "accounts.yml")
-    assert_path_exists File.join(@tmpdir, "rules/bank.yml")
-    assert_path_exists File.join(@tmpdir, "prompts/bank.md")
+    assert_path_exists File.join(@tmpdir, "config.yml")
   end
 
   def test_succeeds_when_dirs_missing
